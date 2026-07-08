@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #faf5ee;
+  --color-linen: #f3e9dc;
+  --color-sand: #e7d6c1;
+  --color-clay: #c19a75;
+  --color-cocoa: #8a5a3c;
+  --color-espresso: #4a3728;
+  --color-ink: #3a2c20;
+  --color-muted: #9c8875;
+
+  --font-sans: var(--font-geist-sans);
+  --font-serif: var(--font-playfair);
+}
+
+:root {
+  --background: #faf5ee;
+  --foreground: #3a2c20;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hide number input spinners for the quantity field */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
