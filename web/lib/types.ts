@@ -1,10 +1,23 @@
 export type Product = {
   id: string | number;
+  sku: string | null;
   name: string;
+  brand: string | null;
+  category: string | null;
   description: string | null;
+  barcode: string | null;
   price: number | null;
+  retail_price: number | null;
+  cost_price: number | null;
   image_url: string | null;
+  gallery_images: string[];
   stock: number | null;
   active: boolean | null;
+  status: string | null;
+  weight_grams: number | null;
+  length_mm: number | null;
+  width_mm: number | null;
+  height_mm: number | null;
   created_at: string | null;
+  updated_at: string | null;
 };

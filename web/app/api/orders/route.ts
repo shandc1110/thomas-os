@@ -3,6 +3,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { allocateOrderNumber, isOrderNumberConflict } from "@/lib/order-number";
 import { sendOrderConfirmationEmail } from "@/lib/order-email";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  recordCustomerOrderMovements,
+  restoreCustomerOrderMovements,
+} from "@/lib/inventory/movements";
+import { getDefaultWarehouseLocation } from "@/lib/warehouse/warehouses";
+import { computeTotalWeightGrams } from "@/lib/weight";
+import { priceForCurrency } from "@/lib/currency";
 import type {
   CreateOrderError,
   CreateOrderRequest,
@@ -20,6 +27,7 @@ type ProductRow = {
   price: number | null;
   stock: number | null;
   active: boolean | null;
+  weight_grams: number | null;
 };
 
 const MAX_CAS_ATTEMPTS = 5;
@@ -192,23 +200,29 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   }
 
   const customer = body?.customer;
-  const name = customer?.name?.trim();
+  const firstName = customer?.first_name?.trim();
+  const lastName = customer?.last_name?.trim();
   const wechatName = customer?.wechat_name?.trim();
   const phone = customer?.phone?.trim();
   const email = customer?.email?.trim();
   const address = customer?.address?.trim();
+  const postcode = customer?.postcode?.trim();
   const paymentMethod = customer?.payment_method?.trim();
   const currencyRaw = customer?.currency?.trim().toUpperCase();
   const currency = currencyRaw === "GBP" ? "GBP" : "CNY";
   const notes = customer?.notes?.trim() || null;
 
-  if (!name) return badRequest("Customer name is required.");
+  if (!firstName) return badRequest("First name is required.");
+  if (!lastName) return badRequest("Last name is required.");
   if (!wechatName) return badRequest("WeChat ID is required.");
   if (!phone) return badRequest("Phone number is required.");
   if (!email) return badRequest("Email address is required.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return badRequest("Please enter a valid email address.");
   if (!address) return badRequest("Delivery address is required.");
+  if (!postcode) return badRequest("Postcode is required.");
   if (!paymentMethod) return badRequest("Please choose a payment method.");
+
+  const customerName = `${firstName} ${lastName}`;
 
   const items = normaliseItems(body?.items);
   if (!items) return badRequest("Your cart is empty or contains invalid items.");
@@ -226,7 +240,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   const ids = items.map((item) => item.product_id);
   const { data: productRows, error: fetchError } = await supabase
     .from("products")
-    .select("id, name, price, stock, active")
+    .select("id, name, price, stock, active, weight_grams")
     .in("id", ids);
 
   if (fetchError) {
@@ -271,46 +285,92 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     );
   }
 
-  // Reserve stock first so a failed order never oversells.
+  // Allocate order number early so stock movements can reference it.
+  const reservedOrderNumber = await allocateOrderNumber(supabase);
+
+  // Reserve stock via immutable ledger movements (falls back if warehouse not configured).
+  const warehouseLoc = await getDefaultWarehouseLocation(supabase);
   const applied: { productId: string | number; quantity: number }[] = [];
-  for (const item of items) {
-    const ok = await decrementStock(supabase, item.product_id, item.quantity);
-    if (!ok) {
-      await restoreStock(supabase, applied);
-      const product = productMap.get(String(item.product_id));
+
+  if (warehouseLoc) {
+    const { error: movError } = await recordCustomerOrderMovements(
+      supabase,
+      items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+      "pending",
+      reservedOrderNumber,
+      warehouseLoc.warehouseId,
+      warehouseLoc.locationId,
+    );
+    if (movError) {
       return NextResponse.json<CreateOrderError>(
         {
           success: false,
           error: "Some items sold out while you were checking out.",
-          issues: [
-            {
+          issues: items.map((item) => {
+            const product = productMap.get(String(item.product_id));
+            return {
               product_id: item.product_id,
               name: product?.name ?? "Unknown item",
               requested: item.quantity,
               available: product?.stock ?? 0,
-            },
-          ],
+            };
+          }),
         },
         { status: 409 },
       );
     }
-    applied.push({ productId: item.product_id, quantity: item.quantity });
+    for (const item of items) applied.push({ productId: item.product_id, quantity: item.quantity });
+  } else {
+    for (const item of items) {
+      const ok = await decrementStock(supabase, item.product_id, item.quantity);
+      if (!ok) {
+        await restoreStock(supabase, applied);
+        const product = productMap.get(String(item.product_id));
+        return NextResponse.json<CreateOrderError>(
+          {
+            success: false,
+            error: "Some items sold out while you were checking out.",
+            issues: [{
+              product_id: item.product_id,
+              name: product?.name ?? "Unknown item",
+              requested: item.quantity,
+              available: product?.stock ?? 0,
+            }],
+          },
+          { status: 409 },
+        );
+      }
+      applied.push({ productId: item.product_id, quantity: item.quantity });
+    }
   }
 
-  const total = items.reduce((sum, item) => {
+  const totalCny = items.reduce((sum, item) => {
     const product = productMap.get(String(item.product_id));
     return sum + (product?.price ?? 0) * item.quantity;
   }, 0);
+  const total = priceForCurrency(totalCny, currency);
+
+  const totalWeightGrams = computeTotalWeightGrams(
+    items.map((item) => {
+      const product = productMap.get(String(item.product_id));
+      return { weight_grams: product?.weight_grams, quantity: item.quantity };
+    }),
+  );
 
   const orderPayload = {
-    customer_name: name,
+    customer_name: customerName,
+    first_name: firstName,
+    last_name: lastName,
     wechat_name: wechatName,
     phone,
     email,
     address,
+    postcode,
     payment_method: paymentMethod,
     currency,
     notes,
+    total_weight_grams: totalWeightGrams,
+    fulfilment_status: "pending",
   };
 
   let orderId: string | number | null = null;
@@ -318,7 +378,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   let orderError: SupabaseError | null = null;
 
   for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
-    const candidateNumber = await allocateOrderNumber(supabase);
+    const candidateNumber = attempt === 0 ? reservedOrderNumber : await allocateOrderNumber(supabase);
     const result = await insertOrderWithFallback(supabase, {
       ...orderPayload,
       order_number: candidateNumber,
@@ -334,7 +394,17 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   }
 
   if (orderError || orderId == null || !orderNumber) {
-    await restoreStock(supabase, applied);
+    if (warehouseLoc) {
+      await restoreCustomerOrderMovements(
+        supabase,
+        applied.map((a) => ({ product_id: a.productId, quantity: a.quantity })),
+        reservedOrderNumber,
+        warehouseLoc.warehouseId,
+        warehouseLoc.locationId,
+      );
+    } else {
+      await restoreStock(supabase, applied);
+    }
     return NextResponse.json<CreateOrderError>(
       { success: false, error: "Could not create your order. Please try again." },
       { status: 500 },
@@ -343,11 +413,12 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
 
   const orderItemsPayload = items.map((item) => {
     const product = productMap.get(String(item.product_id))!;
+    const cnyPrice = product.price ?? 0;
     return {
       order_id: orderId,
       product_id: item.product_id,
       quantity: item.quantity,
-      price: product.price ?? 0,
+      price: priceForCurrency(cnyPrice, currency),
     };
   });
 
@@ -355,7 +426,17 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
 
   if (itemsError) {
     await supabase.from("orders").delete().eq("id", orderId);
-    await restoreStock(supabase, applied);
+    if (warehouseLoc) {
+      await restoreCustomerOrderMovements(
+        supabase,
+        applied.map((a) => ({ product_id: a.productId, quantity: a.quantity })),
+        orderNumber,
+        warehouseLoc.warehouseId,
+        warehouseLoc.locationId,
+      );
+    } else {
+      await restoreStock(supabase, applied);
+    }
     return NextResponse.json<CreateOrderError>(
       { success: false, error: "Could not save your order items. Please try again." },
       { status: 500 },
@@ -365,21 +446,24 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   const emailSent = await sendOrderConfirmationEmail({
     orderNumber,
     customer: {
-      name,
+      first_name: firstName,
+      last_name: lastName,
       wechat_name: wechatName,
       phone,
       email,
       address,
+      postcode,
       payment_method: paymentMethod,
       currency,
       notes: notes ?? undefined,
     },
     items: items.map((item) => {
       const product = productMap.get(String(item.product_id))!;
+      const cnyPrice = product.price ?? 0;
       return {
         name: product.name,
         quantity: item.quantity,
-        price: product.price ?? 0,
+        price: priceForCurrency(cnyPrice, currency),
       };
     }),
     total,

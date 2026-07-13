@@ -36,8 +36,9 @@ function escapeHtml(value: string): string {
 
 function buildText(payload: OrderEmailPayload): string {
   const { orderNumber, customer, items, total } = payload;
+  const fullName = `${customer.first_name} ${customer.last_name}`;
   const lines = [
-    `Thank you for your order, ${customer.name}!`,
+    `Thank you for your order, ${fullName}!`,
     "",
     `Order reference: ${orderNumber}`,
     "",
@@ -51,6 +52,7 @@ function buildText(payload: OrderEmailPayload): string {
     "",
     "Delivery address:",
     customer.address,
+    `Postcode: ${customer.postcode}`,
     "",
     `WeChat ID: ${customer.wechat_name}`,
     `Phone: ${customer.phone}`,
@@ -74,6 +76,7 @@ function buildText(payload: OrderEmailPayload): string {
 
 function buildHtml(payload: OrderEmailPayload): string {
   const { orderNumber, customer, items, total } = payload;
+  const fullName = `${customer.first_name} ${customer.last_name}`;
   const itemRows = items
     .map(
       (item) => `
@@ -105,7 +108,7 @@ function buildHtml(payload: OrderEmailPayload): string {
       <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#b08b7d;text-align:center;">Chosen by Chloe</p>
       <h1 style="margin:0 0 12px;font-size:28px;font-weight:normal;color:#3d2f2a;text-align:center;">Thank you for your order</h1>
       <p style="margin:0 0 24px;color:#6b5b55;line-height:1.6;">
-        Hi ${escapeHtml(customer.name)}, we've received your order. We'll be in touch on WeChat to confirm payment and delivery.
+        Hi ${escapeHtml(fullName)}, we've received your order. We'll be in touch on WeChat to confirm payment and delivery.
       </p>
       <p style="margin:0 0 24px;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;color:#b08b7d;">
         Reference ${escapeHtml(orderNumber)}
@@ -126,6 +129,7 @@ function buildHtml(payload: OrderEmailPayload): string {
       <div style="background:#fff;border:1px solid #f0e8e4;border-radius:16px;padding:20px;">
         <p style="margin:0 0 8px;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#b08b7d;">Delivery details</p>
         <p style="margin:0 0 12px;line-height:1.6;white-space:pre-line;">${escapeHtml(customer.address)}</p>
+        <p style="margin:0 0 12px;line-height:1.6;">Postcode: ${escapeHtml(customer.postcode)}</p>
         <p style="margin:0;color:#6b5b55;line-height:1.8;">
           WeChat ID: ${escapeHtml(customer.wechat_name)}<br />
           Phone: ${escapeHtml(customer.phone)}<br />

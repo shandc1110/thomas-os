@@ -1,28 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useCart } from "@/context/CartContext";
-import { formatPrice } from "@/lib/format";
+import { CNY_TO_GBP_RATE, priceForCurrency } from "@/lib/currency";
+import { formatOrderPrice } from "@/lib/format";
 import type { CreateOrderResponse, StockIssue } from "@/lib/order";
 
 type FormState = {
-  name: string;
+  first_name: string;
+  last_name: string;
   wechat_name: string;
-  phone: string;
   email: string;
   address: string;
+  postcode: string;
+  phone: string;
   payment_method: string;
   currency: string;
   notes: string;
 };
 
 const initialForm: FormState = {
-  name: "",
+  first_name: "",
+  last_name: "",
   wechat_name: "",
-  phone: "",
   email: "",
   address: "",
+  postcode: "",
+  phone: "",
   payment_method: "",
   currency: "CNY",
   notes: "",
@@ -46,8 +51,17 @@ export default function CheckoutPage() {
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
 
+  const displayTotal = useMemo(
+    () => priceForCurrency(totalPrice, form.currency),
+    [totalPrice, form.currency],
+  );
+
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function itemDisplayPrice(cnyPrice: number | null | undefined): string {
+    return formatOrderPrice(priceForCurrency(cnyPrice ?? 0, form.currency), form.currency);
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -62,11 +76,13 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer: {
-            name: form.name,
+            first_name: form.first_name,
+            last_name: form.last_name,
             wechat_name: form.wechat_name,
             phone: form.phone,
             email: form.email,
             address: form.address,
+            postcode: form.postcode,
             payment_method: form.payment_method,
             currency: form.currency,
             notes: form.notes,
@@ -178,7 +194,7 @@ export default function CheckoutPage() {
                 <p className="truncate font-serif text-base text-espresso">
                   {item.product.name}
                 </p>
-                <p className="text-sm text-muted">{formatPrice(item.product.price)}</p>
+                <p className="text-sm text-muted">{itemDisplayPrice(item.product.price)}</p>
               </div>
 
               <div className="flex flex-col items-end gap-2">
@@ -221,35 +237,49 @@ export default function CheckoutPage() {
         <span className="text-sm text-espresso">
           {totalItems} {totalItems === 1 ? "item" : "items"}
         </span>
-        <span className="font-serif text-xl text-espresso">{formatPrice(totalPrice)}</span>
+        <span className="font-serif text-xl text-espresso">
+          {formatOrderPrice(displayTotal, form.currency)}
+        </span>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-4">
         <h2 className="font-serif text-xl text-espresso">Your details</h2>
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="First name"
+            value={form.first_name}
+            onChange={(v) => update("first_name", v)}
+            required
+            autoComplete="given-name"
+          />
+          <Field
+            label="Last name"
+            value={form.last_name}
+            onChange={(v) => update("last_name", v)}
+            required
+            autoComplete="family-name"
+          />
+        </div>
+
         <Field
-          label="Name"
-          value={form.name}
-          onChange={(v) => update("name", v)}
-          required
-          autoComplete="name"
-        />
-        <Field
-          label="WeChat ID"
-          value={form.wechat_name}
-          onChange={(v) => update("wechat_name", v)}
-          required
-        />
-        <Field
-          label="Email"
+          label="Email address"
           type="email"
           value={form.email}
           onChange={(v) => update("email", v)}
           required
           autoComplete="email"
         />
+
         <Field
-          label="Phone"
+          label="WeChat ID"
+          value={form.wechat_name}
+          onChange={(v) => update("wechat_name", v)}
+          required
+        />
+
+        <Field
+          label="Phone number"
           type="tel"
           value={form.phone}
           onChange={(v) => update("phone", v)}
@@ -268,9 +298,17 @@ export default function CheckoutPage() {
             required
             autoComplete="street-address"
             className="w-full rounded-2xl border border-sand bg-white px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-muted/70 focus:border-clay"
-            placeholder="Full delivery address, including postcode"
+            placeholder="Street address, city"
           />
         </label>
+
+        <Field
+          label="Postcode"
+          value={form.postcode}
+          onChange={(v) => update("postcode", v)}
+          required
+          autoComplete="postal-code"
+        />
 
         <Select
           label="Payment method"
@@ -288,6 +326,12 @@ export default function CheckoutPage() {
           options={CURRENCIES}
           required
         />
+
+        {form.currency === "GBP" && (
+          <p className="text-xs text-muted">
+            GBP prices use a fixed rate of ¥{CNY_TO_GBP_RATE} = £1.
+          </p>
+        )}
 
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-espresso">
@@ -322,7 +366,9 @@ export default function CheckoutPage() {
           disabled={submitting || items.length === 0}
           className="w-full rounded-full bg-cocoa px-6 py-4 text-sm font-semibold uppercase tracking-wide text-cream shadow-lg shadow-espresso/20 transition-colors hover:bg-espresso disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Placing order..." : `Place order · ${formatPrice(totalPrice)}`}
+          {submitting
+            ? "Placing order..."
+            : `Place order · ${formatOrderPrice(displayTotal, form.currency)}`}
         </button>
       </form>
     </main>

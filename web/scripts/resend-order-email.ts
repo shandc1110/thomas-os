@@ -14,10 +14,13 @@ type OrderRow = {
   id: string | number;
   order_number: string | null;
   customer_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   wechat_name: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
+  postcode: string | null;
   payment_method: string | null;
   currency: string | null;
   notes: string | null;
@@ -96,11 +99,14 @@ async function run() {
     const sent = await sendOrderConfirmationEmail({
       orderNumber,
       customer: {
-        name: order.customer_name ?? "",
+        first_name: order.first_name ?? order.customer_name?.split(" ")[0] ?? "",
+        last_name:
+          order.last_name ?? order.customer_name?.split(" ").slice(1).join(" ") ?? "",
         wechat_name: order.wechat_name ?? "",
         phone: order.phone ?? "",
         email: overrideArg,
         address: order.address ?? "",
+        postcode: order.postcode ?? "",
         payment_method: order.payment_method ?? "",
         currency,
         notes: order.notes ?? undefined,

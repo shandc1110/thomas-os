@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Product } from "@/lib/types";
@@ -56,6 +57,12 @@ export default function Home() {
           Handpicked pieces, ready to order. Add your favourites to the basket and
           check out.
         </p>
+        <Link
+          href="/admin/login"
+          className="mt-6 inline-flex min-h-11 items-center rounded-full bg-linen px-6 text-sm font-semibold text-espresso ring-1 ring-sand transition hover:bg-sand/50"
+        >
+          Admin Login
+        </Link>
       </header>
 
       {error ? (
