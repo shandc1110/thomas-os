@@ -5,11 +5,11 @@ import { AdminShell } from "@/components/thomas/AdminShell";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLogin = pathname === "/admin/login";
+  const isAuthPage = pathname === "/admin/login" || pathname === "/admin/reset-password";
   const isConsole = pathname === "/admin";
-  const showBack = !isLogin && !isConsole;
+  const showBack = !isAuthPage && !isConsole;
 
-  if (isLogin) {
+  if (isAuthPage) {
     return <>{children}</>;
   }
 

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { Product } from "@/lib/types";
 import { getClientTenant } from "@/lib/thomas";
 import Catalog from "@/components/Catalog";
+import { RecoveryRedirect } from "@/components/thomas/RecoveryRedirect";
 
 export default function Home() {
   const tenant = getClientTenant();
@@ -40,6 +41,7 @@ export default function Home() {
 
   return (
     <main className="mx-auto min-h-full w-full max-w-3xl px-4">
+      <RecoveryRedirect />
       <header className="pt-8 pb-8 text-center">
         <div className="mx-auto mb-5 flex items-center justify-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -30,6 +30,8 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === "/admin/login";
+  const isResetPasswordPage = pathname === "/admin/reset-password";
+  const isPublicAdminAuthPage = isLoginPage || isResetPasswordPage;
   const isApiRoute = pathname.startsWith("/api/");
   const isAdminRoute = pathname.startsWith("/admin");
 
@@ -43,8 +45,8 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  // Admin pages — redirect to login
-  if (isAdminRoute && !user && !isLoginPage) {
+  // Admin pages — redirect to login (allow login + password reset without session)
+  if (isAdminRoute && !user && !isPublicAdminAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin/login";
     if (pathname !== "/admin") {
@@ -53,6 +55,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Logged-in users on login page → admin (do not bounce reset-password away)
   if (isAdminRoute && user && isLoginPage) {
     const next = request.nextUrl.searchParams.get("next") || "/admin";
     return NextResponse.redirect(new URL(next, request.url));
