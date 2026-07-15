@@ -24,6 +24,8 @@ export const chosenByChloeTenant: TenantConfig = {
     orderNumberStart: 9001,
     cartStorageKey: "thomas-cart-chosen-by-chloe-v1",
     cnyToGbpRate: 9.25,
+    /** 10% FX markup: effective rate = 9.25 × 1.1 (customer pays more in GBP). */
+    cnyToGbpMarkup: 1.1,
     defaultCurrency: "CNY",
   },
   email: {

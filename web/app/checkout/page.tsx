@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useCart } from "@/context/CartContext";
-import { getDisplayCnyToGbpRate, priceForCurrency } from "@/lib/currency";
+import { getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate, priceForCurrency } from "@/lib/currency";
 import { formatOrderPrice } from "@/lib/format";
 import type { CreateOrderResponse, StockIssue } from "@/lib/order";
 
@@ -329,7 +329,8 @@ export default function CheckoutPage() {
 
         {form.currency === "GBP" && (
           <p className="text-xs text-muted">
-            GBP prices use a fixed rate of ¥{getDisplayCnyToGbpRate()} = £1.
+            GBP prices use ¥{getDisplayCnyToGbpRate()} = £1 with a{" "}
+            {Math.round((getDisplayCnyToGbpMarkup() - 1) * 100)}% FX markup.
           </p>
         )}
 

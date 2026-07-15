@@ -22,6 +22,8 @@ export type TenantConfig = {
     orderNumberStart: number;
     cartStorageKey: string;
     cnyToGbpRate: number;
+    /** Multiplier applied after CNY→GBP conversion (e.g. 1.1 = 10% markup). */
+    cnyToGbpMarkup: number;
     defaultCurrency: "CNY" | "GBP";
   };
   email: {

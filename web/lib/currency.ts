@@ -10,15 +10,28 @@ function getCnyToGbpRate(): number {
   return getActiveTenant().commerce.cnyToGbpRate;
 }
 
-/** Tenant-configured CNY→GBP rate for display (e.g. checkout footer). */
+function getCnyToGbpMarkup(): number {
+  return getActiveTenant().commerce.cnyToGbpMarkup;
+}
+
+/** Tenant base CNY→GBP rate for display (before markup). */
 export function getDisplayCnyToGbpRate(): number {
   return getCnyToGbpRate();
 }
 
-/** Convert a CNY amount to GBP using the tenant exchange rate. */
+/** Tenant FX markup multiplier (e.g. 1.1). */
+export function getDisplayCnyToGbpMarkup(): number {
+  return getCnyToGbpMarkup();
+}
+
+/**
+ * Convert a CNY amount to GBP using the tenant exchange rate + markup.
+ * Example: ¥925 / 9.25 × 1.1 = £110.
+ */
 export function convertCnyToGbp(cnyAmount: number): number {
   const rate = getCnyToGbpRate();
-  return Math.round((cnyAmount / rate) * 100) / 100;
+  const markup = getCnyToGbpMarkup();
+  return Math.round((cnyAmount / rate) * markup * 100) / 100;
 }
 
 /** Return the order price for the chosen currency (catalog prices are stored in CNY). */
