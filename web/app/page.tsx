@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import type { Product } from "@/lib/types";
 import { getClientTenant } from "@/lib/thomas";
 import { getSellableStock } from "@/lib/presell";
@@ -17,22 +16,27 @@ export default function Home() {
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("active", true)
-        .order("created_at", { ascending: false });
+      try {
+        const response = await fetch("/api/catalog");
+        const result = (await response.json()) as {
+          success: boolean;
+          products?: Product[];
+          error?: string;
+        };
 
-      if (error) {
-        setError(error.message);
-      } else {
-        // Keep sold-out items visible (clearly marked) but sort them last.
-        const rows = ((data as Product[]) ?? []).slice().sort((a, b) => {
-          const aOut = getSellableStock(a) <= 0 ? 1 : 0;
-          const bOut = getSellableStock(b) <= 0 ? 1 : 0;
-          return aOut - bOut;
-        });
-        setProducts(rows);
+        if (!response.ok || !result.success) {
+          setError(result.error ?? "Could not load products.");
+        } else {
+          // Keep sold-out items visible (clearly marked) but sort them last.
+          const rows = (result.products ?? []).slice().sort((a, b) => {
+            const aOut = getSellableStock(a) <= 0 ? 1 : 0;
+            const bOut = getSellableStock(b) <= 0 ? 1 : 0;
+            return aOut - bOut;
+          });
+          setProducts(rows);
+        }
+      } catch {
+        setError("Could not load products.");
       }
       setLoading(false);
     }

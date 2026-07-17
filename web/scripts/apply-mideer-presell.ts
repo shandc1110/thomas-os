@@ -112,6 +112,8 @@ async function main() {
     sku: string;
     name: string;
     cost_price: number | null;
+    price: number | null;
+    retail_price: number | null;
     presell_enabled: boolean;
     presell_quantity: number;
     expected_arrival_month: string;
@@ -120,10 +122,13 @@ async function main() {
 
   for (const row of piRows) {
     const presell = resolvePresell(row.sku, row.pcs);
+    const unitPrice = row.unitPrice > 0 ? row.unitPrice : null;
     updates.push({
       sku: row.sku,
       name: row.name,
-      cost_price: row.unitPrice > 0 ? row.unitPrice : null,
+      cost_price: unitPrice,
+      price: unitPrice,
+      retail_price: unitPrice,
       ...presell,
     });
   }
@@ -134,6 +139,8 @@ async function main() {
       sku,
       name: sku,
       cost_price: null,
+      price: null,
+      retail_price: null,
       ...presell,
     });
   }
@@ -150,6 +157,8 @@ async function main() {
       brand: "Mideer",
       active: true,
       cost_price: u.cost_price,
+      price: u.price,
+      retail_price: u.retail_price,
       presell_enabled: u.presell_enabled,
       presell_quantity: u.presell_quantity,
       expected_arrival_month: u.expected_arrival_month,

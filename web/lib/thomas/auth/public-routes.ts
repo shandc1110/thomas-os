@@ -1,5 +1,6 @@
 /** API routes that do not require staff authentication. */
 const PUBLIC_API_ROUTES: { method: string; path: string }[] = [
+  { method: "GET", path: "/api/catalog" },
   { method: "POST", path: "/api/orders" },
 ];
 
