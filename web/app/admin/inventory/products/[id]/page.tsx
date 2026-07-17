@@ -3,9 +3,122 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatOrderPrice } from "@/lib/format";
+import { ARRIVAL_MONTH_OPTIONS, formatExpectedArrival } from "@/lib/presell";
 import type { ProductMaster, InventoryBalance, ProductLedgerEntry } from "@/types/inventory";
 
 type PageProps = { params: Promise<{ id: string }> };
+
+function PresellPanel({
+  product,
+  onSaved,
+}: {
+  product: ProductMaster;
+  onSaved: (p: ProductMaster) => void;
+}) {
+  const [enabled, setEnabled] = useState(Boolean(product.presell_enabled));
+  const [quantity, setQuantity] = useState(product.presell_quantity ?? 0);
+  const [arrivalMonth, setArrivalMonth] = useState(product.expected_arrival_month ?? "");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEnabled(Boolean(product.presell_enabled));
+    setQuantity(product.presell_quantity ?? 0);
+    setArrivalMonth(product.expected_arrival_month ?? "");
+  }, [product]);
+
+  async function handleSave() {
+    setSaving(true);
+    setMessage(null);
+    const res = await fetch(`/api/inventory/products/${product.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "presell",
+        presell_enabled: enabled,
+        presell_quantity: quantity,
+        expected_arrival_month: arrivalMonth || null,
+      }),
+    });
+    const result = await res.json();
+    setSaving(false);
+    if (!result.success) {
+      setMessage(result.error ?? "Could not save pre-sell settings.");
+      return;
+    }
+    onSaved(result.product);
+    setMessage("Pre-sell settings saved.");
+  }
+
+  return (
+    <section className="rounded-2xl bg-white p-5 ring-1 ring-sand/60">
+      <h3 className="font-serif text-lg text-espresso">Pre-sell (in transit)</h3>
+      <p className="mt-1 text-sm text-muted">
+        Sell units before they arrive in the warehouse. Customers see the expected arrival month on the shop.
+      </p>
+
+      <div className="mt-4 space-y-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="h-4 w-4 rounded border-sand"
+          />
+          Enable pre-sell for this product
+        </label>
+
+        <label className="block text-sm">
+          <span className="font-medium text-espresso">Pre-sell quantity (in shipment)</span>
+          <input
+            type="number"
+            min={0}
+            value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            className="mt-1.5 w-full max-w-xs rounded-2xl border border-sand px-4 py-2.5"
+          />
+        </label>
+
+        <label className="block text-sm">
+          <span className="font-medium text-espresso">Expected arrival</span>
+          <select
+            value={arrivalMonth}
+            onChange={(e) => setArrivalMonth(e.target.value)}
+            className="mt-1.5 w-full max-w-xs rounded-2xl border border-sand px-4 py-2.5"
+          >
+            <option value="">Select month…</option>
+            {ARRIVAL_MONTH_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {arrivalMonth && (
+          <p className="text-xs text-muted">
+            Shop label: Pre-order · {formatExpectedArrival(arrivalMonth)}
+          </p>
+        )}
+
+        {message && (
+          <p className={`text-sm ${message.includes("saved") ? "text-green-700" : "text-red-700"}`}>
+            {message}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-full bg-cocoa px-5 py-2 text-sm font-semibold text-cream disabled:opacity-60"
+        >
+          {saving ? "Saving…" : "Save pre-sell"}
+        </button>
+      </div>
+    </section>
+  );
+}
 
 export default function ProductDetailPage({ params }: PageProps) {
   const [productId, setProductId] = useState<string | null>(null);
@@ -62,9 +175,10 @@ export default function ProductDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          ["Available", totalAvailable],
+          ["On hand", totalAvailable],
+          ["Pre-sell", product.presell_enabled ? product.presell_quantity ?? 0 : 0],
           ["Cost", formatOrderPrice(product.cost_price, product.currency)],
           ["Retail", formatOrderPrice(product.retail_price ?? product.price, product.currency)],
           ["Weight", product.weight_grams ? `${product.weight_grams}g` : "—"],
@@ -96,6 +210,8 @@ export default function ProductDetailPage({ params }: PageProps) {
           ))}
         </dl>
       </section>
+
+      <PresellPanel product={product} onSaved={setProduct} />
 
       {balances.length > 0 && (
         <section className="rounded-2xl bg-white p-5 ring-1 ring-sand/60">

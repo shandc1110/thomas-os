@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 import type { Product } from "@/lib/types";
+import {
+  formatExpectedArrival,
+  getOnHandStock,
+  getPresellStock,
+  getSellableStock,
+  isPresellOnly,
+} from "@/lib/presell";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
 
@@ -22,12 +29,16 @@ export default function ProductCard({ product }: ProductCardProps) {
   const { addItem, getQuantity } = useCart();
   const [selected, setSelected] = useState(1);
 
-  const stock = product.stock ?? 0;
-  const soldOut = stock <= 0;
-  const lowStock = !soldOut && stock <= 3;
+  const onHand = getOnHandStock(product);
+  const presellStock = getPresellStock(product);
+  const sellable = getSellableStock(product);
+  const presellOnly = isPresellOnly(product);
+  const soldOut = sellable <= 0;
+  const lowStock = !soldOut && onHand > 0 && onHand <= 3;
+  const arrivalLabel = formatExpectedArrival(product.expected_arrival_month);
 
   const inCart = getQuantity(product.id);
-  const remaining = Math.max(stock - inCart, 0);
+  const remaining = Math.max(sellable - inCart, 0);
   const maxSelectable = Math.max(remaining, 1);
   const clampedSelected = Math.min(selected, maxSelectable);
   const canAdd = !soldOut && remaining > 0;
@@ -75,9 +86,15 @@ export default function ProductCard({ product }: ProductCardProps) {
           </div>
         )}
 
+        {presellOnly && arrivalLabel && (
+          <span className="absolute left-3 top-3 rounded-full bg-clay/95 px-3 py-1 text-[11px] font-semibold text-cream shadow-sm">
+            Pre-order · {arrivalLabel}
+          </span>
+        )}
+
         {lowStock && (
           <span className="absolute left-3 top-3 rounded-full bg-cocoa/90 px-3 py-1 text-[11px] font-medium text-cream shadow-sm">
-            Only {stock} left
+            Only {onHand} left
           </span>
         )}
       </div>
@@ -90,6 +107,16 @@ export default function ProductCard({ product }: ProductCardProps) {
           {product.description && (
             <p className="line-clamp-2 text-sm text-muted">{product.description}</p>
           )}
+          {presellOnly && arrivalLabel && (
+            <p className="text-xs font-medium text-clay">
+              Ships when stock arrives ({arrivalLabel})
+            </p>
+          )}
+          {!presellOnly && presellStock > 0 && arrivalLabel && (
+            <p className="text-xs text-muted">
+              +{presellStock} pre-order for {arrivalLabel}
+            </p>
+          )}
         </div>
 
         <div className="flex items-end justify-between">
@@ -97,7 +124,10 @@ export default function ProductCard({ product }: ProductCardProps) {
             {formatPrice(product.price)}
           </span>
           {!soldOut && (
-            <span className="text-xs text-muted">{stock} in stock</span>
+            <span className="text-xs text-muted">
+              {onHand > 0 ? `${onHand} in stock` : "Pre-order"}
+              {presellStock > 0 && onHand > 0 ? ` · ${presellStock} incoming` : ""}
+            </span>
           )}
         </div>
 
@@ -141,7 +171,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               disabled={!canAdd}
               className="w-full rounded-full bg-cocoa py-2.5 text-sm font-semibold uppercase tracking-wide text-cream shadow-sm transition-colors hover:bg-espresso disabled:cursor-not-allowed disabled:bg-sand disabled:text-muted"
             >
-              {canAdd ? "Add to cart" : "Max in cart"}
+              {canAdd ? (presellOnly ? "Pre-order" : "Add to cart") : "Max in cart"}
             </button>
 
             {inCart > 0 && (

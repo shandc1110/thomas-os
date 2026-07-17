@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate, priceForCurrency } from "@/lib/currency";
 import { formatOrderPrice } from "@/lib/format";
+import { getSellableStock, formatExpectedArrival, isPresellOnly } from "@/lib/presell";
 import type { CreateOrderResponse, StockIssue } from "@/lib/order";
 
 type FormState = {
@@ -173,7 +174,8 @@ export default function CheckoutPage() {
 
       <section className="mt-5 space-y-3">
         {items.map((item) => {
-          const stock = item.product.stock ?? 0;
+          const sellable = getSellableStock(item.product);
+          const arrival = formatExpectedArrival(item.product.expected_arrival_month);
           return (
             <div
               key={String(item.product.id)}
@@ -195,6 +197,9 @@ export default function CheckoutPage() {
                   {item.product.name}
                 </p>
                 <p className="text-sm text-muted">{itemDisplayPrice(item.product.price)}</p>
+                {isPresellOnly(item.product) && arrival && (
+                  <p className="text-xs text-clay">Pre-order · arrives {arrival}</p>
+                )}
               </div>
 
               <div className="flex flex-col items-end gap-2">
@@ -213,7 +218,7 @@ export default function CheckoutPage() {
                   <button
                     type="button"
                     onClick={() => setQuantity(item.product.id, item.quantity + 1)}
-                    disabled={item.quantity >= stock}
+                    disabled={item.quantity >= sellable}
                     aria-label={`Increase ${item.product.name}`}
                     className="flex h-7 w-7 items-center justify-center rounded-full bg-cocoa text-cream shadow-sm disabled:opacity-40"
                   >

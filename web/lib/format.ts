@@ -25,6 +25,8 @@ export function formatFulfilmentStatus(status: string | null | undefined): strin
       return "Ready";
     case "fulfilled":
       return "Fulfilled";
+    case "awaiting_stock":
+      return "Pre-order";
     default:
       return "Pending";
   }

@@ -28,6 +28,9 @@ export type ProductMaster = {
   tags: string[];
   low_stock_threshold: number | null;
   stock: number | null;
+  presell_enabled: boolean | null;
+  presell_quantity: number | null;
+  expected_arrival_month: string | null;
   created_at: string | null;
   updated_at: string | null;
 };

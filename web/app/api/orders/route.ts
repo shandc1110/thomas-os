@@ -9,6 +9,7 @@ import {
 } from "@/lib/inventory/movements";
 import { getDefaultWarehouseLocation } from "@/lib/warehouse/warehouses";
 import { computeTotalWeightGrams } from "@/lib/weight";
+import { getSellableStock, getOnHandStock } from "@/lib/presell";
 import { priceForCurrency } from "@/lib/currency";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
 import type {
@@ -27,6 +28,9 @@ type ProductRow = {
   name: string;
   price: number | null;
   stock: number | null;
+  presell_enabled: boolean | null;
+  presell_quantity: number | null;
+  expected_arrival_month: string | null;
   active: boolean | null;
   weight_grams: number | null;
 };
@@ -180,7 +184,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   const ids = items.map((item) => item.product_id);
   const { data: productRows, error: fetchError } = await supabase
     .from("products")
-    .select("id, name, price, stock, active, weight_grams")
+    .select("id, name, price, stock, presell_enabled, presell_quantity, expected_arrival_month, active, weight_grams")
     .in("id", ids);
 
   if (fetchError) {
@@ -207,13 +211,13 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
       });
       continue;
     }
-    const available = product.stock ?? 0;
-    if (available < item.quantity) {
+    const sellable = getSellableStock(product);
+    if (sellable < item.quantity) {
       issues.push({
         product_id: item.product_id,
         name: product.name,
         requested: item.quantity,
-        available,
+        available: sellable,
       });
     }
   }
@@ -241,14 +245,23 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
 
   const applied = items.map((item) => ({ productId: item.product_id, quantity: item.quantity }));
 
-  const { error: movError } = await recordCustomerOrderMovements(
+  const { allocations, error: movError } = await recordCustomerOrderMovements(
     supabase,
-    items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+    items.map((item) => {
+      const product = productMap.get(String(item.product_id))!;
+      return {
+        product_id: item.product_id,
+        quantity: item.quantity,
+        on_hand: getOnHandStock(product),
+      };
+    }),
     "pending",
     reservedOrderNumber,
     warehouseLoc.warehouseId,
     warehouseLoc.locationId,
   );
+
+  const allocationMap = new Map(allocations.map((a) => [String(a.product_id), a.presell_quantity]));
 
   if (movError) {
     return NextResponse.json<CreateOrderError>(
@@ -261,7 +274,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
             product_id: item.product_id,
             name: product?.name ?? "Unknown item",
             requested: item.quantity,
-            available: product?.stock ?? 0,
+            available: product ? getSellableStock(product) : 0,
           };
         }),
       },
@@ -283,6 +296,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   );
 
   const tenant = getActiveTenant();
+  const hasPresell = allocations.some((a) => a.presell_quantity > 0);
   const orderPayload = {
     customer_name: customerName,
     first_name: firstName,
@@ -296,7 +310,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     currency,
     notes,
     total_weight_grams: totalWeightGrams,
-    fulfilment_status: "pending",
+    fulfilment_status: hasPresell ? "awaiting_stock" : "pending",
     organization_id: tenant.organizationId,
   };
 
@@ -323,7 +337,11 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   if (orderError || orderId == null || !orderNumber) {
     await restoreCustomerOrderMovements(
       supabase,
-      applied.map((a) => ({ product_id: a.productId, quantity: a.quantity })),
+      applied.map((a) => ({
+        product_id: a.productId,
+        quantity: a.quantity,
+        presell_quantity: allocationMap.get(String(a.productId)) ?? 0,
+      })),
       reservedOrderNumber,
       warehouseLoc.warehouseId,
       warehouseLoc.locationId,
@@ -342,6 +360,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
       product_id: item.product_id,
       quantity: item.quantity,
       price: priceForCurrency(cnyPrice, currency),
+      presell_quantity: allocationMap.get(String(item.product_id)) ?? 0,
     };
   });
 
@@ -351,7 +370,11 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     await supabase.from("orders").delete().eq("id", orderId);
     await restoreCustomerOrderMovements(
       supabase,
-      applied.map((a) => ({ product_id: a.productId, quantity: a.quantity })),
+      applied.map((a) => ({
+        product_id: a.productId,
+        quantity: a.quantity,
+        presell_quantity: allocationMap.get(String(a.productId)) ?? 0,
+      })),
       orderNumber,
       warehouseLoc.warehouseId,
       warehouseLoc.locationId,

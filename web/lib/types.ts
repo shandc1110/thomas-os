@@ -12,6 +12,9 @@ export type Product = {
   image_url: string | null;
   gallery_images: string[];
   stock: number | null;
+  presell_enabled: boolean | null;
+  presell_quantity: number | null;
+  expected_arrival_month: string | null;
   active: boolean | null;
   status: string | null;
   weight_grams: number | null;

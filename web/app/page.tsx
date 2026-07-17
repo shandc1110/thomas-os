@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Product } from "@/lib/types";
 import { getClientTenant } from "@/lib/thomas";
+import { getSellableStock } from "@/lib/presell";
 import Catalog from "@/components/Catalog";
 import { RecoveryRedirect } from "@/components/thomas/RecoveryRedirect";
 
@@ -27,8 +28,8 @@ export default function Home() {
       } else {
         // Keep sold-out items visible (clearly marked) but sort them last.
         const rows = ((data as Product[]) ?? []).slice().sort((a, b) => {
-          const aOut = (a.stock ?? 0) <= 0 ? 1 : 0;
-          const bOut = (b.stock ?? 0) <= 0 ? 1 : 0;
+          const aOut = getSellableStock(a) <= 0 ? 1 : 0;
+          const bOut = getSellableStock(b) <= 0 ? 1 : 0;
           return aOut - bOut;
         });
         setProducts(rows);

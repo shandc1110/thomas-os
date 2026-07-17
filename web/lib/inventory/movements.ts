@@ -171,53 +171,125 @@ export async function createStockMovement(
   return { movementId: movement.id as string, error: null };
 }
 
-/** Reserve stock for a customer order (decrease available). */
+/** Reserve stock for a customer order (decrease available, then pre-sell pool). */
 export async function recordCustomerOrderMovements(
   supabase: SupabaseClient,
-  items: { product_id: string | number; quantity: number }[],
+  items: {
+    product_id: string | number;
+    quantity: number;
+    on_hand?: number;
+  }[],
   orderId: string | number,
   orderNumber: string,
   warehouseId: string,
   locationId: string,
-): Promise<{ error: string | null }> {
+): Promise<{ allocations: { product_id: string | number; presell_quantity: number }[]; error: string | null }> {
+  const allocations: { product_id: string | number; presell_quantity: number }[] = [];
+
   for (const item of items) {
-    const { error } = await createStockMovement(supabase, {
-      movement_type: "customer_order",
-      product_id: item.product_id,
-      quantity: -item.quantity,
-      warehouse_id: warehouseId,
-      location_id: locationId,
-      reference_type: "order",
-      reference_id: String(orderNumber),
-      reason: `Order ${orderNumber}`,
-      notes: `Order ID ${orderId}`,
-      bucket: "available",
-    });
-    if (error) return { error };
+    const onHand = Math.max(item.on_hand ?? 0, 0);
+    const fromAvailable = Math.min(item.quantity, onHand);
+    const fromPresell = item.quantity - fromAvailable;
+
+    if (fromAvailable > 0) {
+      const { error } = await createStockMovement(supabase, {
+        movement_type: "customer_order",
+        product_id: item.product_id,
+        quantity: -fromAvailable,
+        warehouse_id: warehouseId,
+        location_id: locationId,
+        reference_type: "order",
+        reference_id: String(orderNumber),
+        reason: `Order ${orderNumber}`,
+        notes: `Order ID ${orderId}`,
+        bucket: "available",
+      });
+      if (error) return { allocations: [], error };
+    }
+
+    if (fromPresell > 0) {
+      const { data: product, error: fetchError } = await supabase
+        .from("products")
+        .select("presell_quantity, presell_enabled")
+        .eq("id", item.product_id)
+        .single();
+
+      if (fetchError || !product?.presell_enabled) {
+        return { allocations: [], error: "Pre-sell is no longer available for an item in your cart." };
+      }
+
+      const currentPresell = (product.presell_quantity as number) ?? 0;
+      if (currentPresell < fromPresell) {
+        return {
+          allocations: [],
+          error: `Insufficient pre-sell stock. Available: ${currentPresell}, requested: ${fromPresell}.`,
+        };
+      }
+
+      const { data: updated, error: updateError } = await supabase
+        .from("products")
+        .update({
+          presell_quantity: currentPresell - fromPresell,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", item.product_id)
+        .eq("presell_quantity", currentPresell)
+        .select("id")
+        .single();
+
+      if (updateError || !updated) {
+        return { allocations: [], error: "Pre-sell stock changed while checking out. Please try again." };
+      }
+    }
+
+    allocations.push({ product_id: item.product_id, presell_quantity: fromPresell });
   }
-  return { error: null };
+
+  return { allocations, error: null };
 }
 
 /** Restore stock after a failed order (compensation). */
 export async function restoreCustomerOrderMovements(
   supabase: SupabaseClient,
-  items: { product_id: string | number; quantity: number }[],
+  items: { product_id: string | number; quantity: number; presell_quantity?: number }[],
   orderNumber: string,
   warehouseId: string,
   locationId: string,
 ): Promise<void> {
   for (const item of items) {
-    await createStockMovement(supabase, {
-      movement_type: "return",
-      product_id: item.product_id,
-      quantity: item.quantity,
-      warehouse_id: warehouseId,
-      location_id: locationId,
-      reference_type: "order_rollback",
-      reference_id: String(orderNumber),
-      reason: `Order ${orderNumber} rollback`,
-      bucket: "available",
-    });
+    const presellQty = item.presell_quantity ?? 0;
+    const availableQty = item.quantity - presellQty;
+
+    if (availableQty > 0) {
+      await createStockMovement(supabase, {
+        movement_type: "return",
+        product_id: item.product_id,
+        quantity: availableQty,
+        warehouse_id: warehouseId,
+        location_id: locationId,
+        reference_type: "order_rollback",
+        reference_id: String(orderNumber),
+        reason: `Order ${orderNumber} rollback`,
+        bucket: "available",
+      });
+    }
+
+    if (presellQty > 0) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("presell_quantity")
+        .eq("id", item.product_id)
+        .single();
+
+      const current = (product?.presell_quantity as number) ?? 0;
+      await supabase
+        .from("products")
+        .update({
+          presell_quantity: current + presellQty,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", item.product_id);
+    }
   }
 }
 

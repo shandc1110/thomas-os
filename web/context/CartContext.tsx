@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { Product } from "@/lib/types";
 import { getClientTenant } from "@/lib/thomas/tenant/resolve";
+import { getSellableStock } from "@/lib/presell";
 
 export type CartItem = {
   product: Product;
@@ -34,9 +35,9 @@ const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = getClientTenant().commerce.cartStorageKey;
 
 function clampToStock(quantity: number, product: Product): number {
-  const stock = product.stock ?? 0;
+  const sellable = getSellableStock(product);
   if (quantity < 0) return 0;
-  if (quantity > stock) return stock;
+  if (quantity > sellable) return sellable;
   return quantity;
 }
 

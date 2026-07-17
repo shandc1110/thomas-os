@@ -238,12 +238,40 @@ export async function upsertProduct(
     gallery_images: input.gallery_images ?? [],
     tags: input.tags ?? [],
     low_stock_threshold: input.low_stock_threshold ?? 5,
+    presell_enabled: input.presell_enabled ?? false,
+    presell_quantity: input.presell_quantity ?? 0,
+    expected_arrival_month: input.expected_arrival_month ?? null,
     updated_at: new Date().toISOString(),
   };
 
   const { data, error } = await supabase
     .from("products")
     .upsert(payload, { onConflict: "sku" })
+    .select()
+    .single();
+
+  if (error) return { product: null, error: error.message };
+  return { product: mapProductRow(data), error: null };
+}
+
+export async function updateProductPresell(
+  supabase: SupabaseClient,
+  productId: string,
+  input: {
+    presell_enabled: boolean;
+    presell_quantity: number;
+    expected_arrival_month: string | null;
+  },
+): Promise<{ product: ProductMaster | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from("products")
+    .update({
+      presell_enabled: input.presell_enabled,
+      presell_quantity: Math.max(0, input.presell_quantity),
+      expected_arrival_month: input.expected_arrival_month,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", productId)
     .select()
     .single();
 
@@ -277,6 +305,9 @@ function mapProductRow(row: Record<string, unknown>): ProductMaster {
     gallery_images: (row.gallery_images as string[]) ?? [],
     tags: (row.tags as string[]) ?? [],
     low_stock_threshold: (row.low_stock_threshold as number | null) ?? 5,
+    presell_enabled: (row.presell_enabled as boolean | null) ?? false,
+    presell_quantity: (row.presell_quantity as number | null) ?? 0,
+    expected_arrival_month: (row.expected_arrival_month as string | null) ?? null,
     stock: (row.stock as number | null) ?? 0,
     created_at: (row.created_at as string | null) ?? null,
     updated_at: (row.updated_at as string | null) ?? null,
