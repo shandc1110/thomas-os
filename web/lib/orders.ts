@@ -19,10 +19,13 @@ type OrderItemRow = {
   product_id: string | number;
   quantity: number;
   price: number;
+  presell_quantity?: number | null;
   products: {
     name: string;
     sku: string | null;
     weight_grams: number | null;
+    image_url: string | null;
+    gallery_images: string[] | null;
   } | null;
 };
 
@@ -63,6 +66,9 @@ function mapOrderItemRow(row: OrderItemRow): OrderItemRecord {
     product_name: row.products?.name ?? "Unknown item",
     product_sku: row.products?.sku ?? null,
     product_weight_grams: row.products?.weight_grams ?? null,
+    product_image_url: row.products?.image_url ?? null,
+    product_gallery_images: (row.products?.gallery_images as string[] | null) ?? [],
+    presell_quantity: (row.presell_quantity as number | null) ?? 0,
   };
 }
 
@@ -126,7 +132,8 @@ export async function getOrderById(
         product_id,
         quantity,
         price,
-        products ( name, sku, weight_grams )
+        presell_quantity,
+        products ( name, sku, weight_grams, image_url, gallery_images )
       )
     `,
     )
@@ -162,13 +169,22 @@ export async function getOrderById(
 
 export function buildPackingSlipData(order: OrderWithItems): PackingSlipData {
   const orderNumber = order.order_number ?? String(order.id);
-  const items = order.items.map((item) => ({
-    name: item.product_name,
-    sku: item.product_sku,
-    quantity: item.quantity,
-    unitPrice: item.price,
-    lineTotal: item.price * item.quantity,
-  }));
+  const items = order.items.map((item) => {
+    const urls: string[] = [];
+    if (item.product_image_url) urls.push(item.product_image_url);
+    for (const g of item.product_gallery_images ?? []) {
+      if (g && !urls.includes(g)) urls.push(g);
+      if (urls.length >= 3) break;
+    }
+    return {
+      name: item.product_name,
+      sku: item.product_sku,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      lineTotal: item.price * item.quantity,
+      imageUrls: urls.slice(0, 3),
+    };
+  });
 
   const subtotal = order.total;
   const totalWeightGrams =
@@ -208,6 +224,7 @@ export async function updateOrderFulfilment(
     shopify_draft_order_id?: string;
     fulfilment_status?: FulfilmentStatus;
     total_weight_grams?: number;
+    warehouse_status?: string;
   },
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from("orders").update(updates).eq("id", orderId);
@@ -218,4 +235,100 @@ export async function updateOrderFulfilment(
   }
 
   return { error: null };
+}
+
+/** Mark order as fulfilled (shipped). */
+export async function markOrderFulfilled(
+  supabase: SupabaseClient,
+  orderId: string,
+  organizationId?: string,
+): Promise<{ order: OrderWithItems | null; error: string | null }> {
+  const { order, error } = await getOrderById(supabase, orderId, organizationId);
+  if (error || !order) return { order: null, error: error ?? "Order not found." };
+
+  if (order.fulfilment_status === "cancelled") {
+    return { order: null, error: "Cannot fulfil a cancelled order." };
+  }
+  if (order.fulfilment_status === "fulfilled") {
+    return { order, error: null };
+  }
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      fulfilment_status: "fulfilled",
+      warehouse_status: "shipped",
+      shipped_at: new Date().toISOString(),
+    })
+    .eq("id", orderId);
+
+  if (updateError) return { order: null, error: updateError.message };
+
+  return getOrderById(supabase, orderId, organizationId);
+}
+
+/** Cancel order and restore on-hand + pre-sell stock. */
+export async function cancelOrder(
+  supabase: SupabaseClient,
+  orderId: string,
+  organizationId?: string,
+): Promise<{ order: OrderWithItems | null; error: string | null }> {
+  const { order, error } = await getOrderById(supabase, orderId, organizationId);
+  if (error || !order) return { order: null, error: error ?? "Order not found." };
+
+  if (order.fulfilment_status === "cancelled" || order.warehouse_status === "cancelled") {
+    return { order, error: null };
+  }
+  if (order.fulfilment_status === "fulfilled" || order.warehouse_status === "shipped") {
+    return { order: null, error: "Cannot cancel a fulfilled/shipped order." };
+  }
+
+  const { getDefaultWarehouseLocation } = await import("@/lib/warehouse/warehouses");
+  const { restoreCustomerOrderMovements } = await import("@/lib/inventory/movements");
+
+  const warehouseLoc = await getDefaultWarehouseLocation(supabase);
+  if (!warehouseLoc) {
+    return { order: null, error: "No default warehouse location found." };
+  }
+
+  const orderNumber = order.order_number ?? String(order.id);
+
+  // Avoid double-restore if cancel was partially applied before
+  const { data: existingReturns } = await supabase
+    .from("stock_movements")
+    .select("product_id")
+    .eq("reference_id", orderNumber)
+    .in("reference_type", ["order_cancel", "order_rollback"]);
+
+  const alreadyRestored = new Set((existingReturns ?? []).map((r) => String(r.product_id)));
+
+  const toRestore = order.items
+    .filter((item) => !alreadyRestored.has(String(item.product_id)))
+    .map((item) => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      presell_quantity: item.presell_quantity ?? 0,
+    }));
+
+  if (toRestore.length > 0) {
+    await restoreCustomerOrderMovements(
+      supabase,
+      toRestore,
+      orderNumber,
+      warehouseLoc.warehouseId,
+      warehouseLoc.locationId,
+    );
+  }
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({
+      fulfilment_status: "cancelled",
+      warehouse_status: "cancelled",
+    })
+    .eq("id", orderId);
+
+  if (updateError) return { order: null, error: updateError.message };
+
+  return getOrderById(supabase, orderId, organizationId);
 }

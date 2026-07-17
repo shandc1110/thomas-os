@@ -1,6 +1,6 @@
 import type { WarehouseOrderStatus } from "@/types/warehouse-ops";
 
-export type FulfilmentStatus = "pending" | "ready" | "fulfilled";
+export type FulfilmentStatus = "pending" | "ready" | "fulfilled" | "awaiting_stock" | "cancelled";
 
 export type OrderRecord = {
   id: string | number;
@@ -36,6 +36,9 @@ export type OrderItemRecord = {
   product_name: string;
   product_sku: string | null;
   product_weight_grams: number | null;
+  product_image_url: string | null;
+  product_gallery_images: string[];
+  presell_quantity: number;
 };
 
 export type OrderWithItems = OrderRecord & {
@@ -67,6 +70,8 @@ export type PackingSlipData = {
     quantity: number;
     unitPrice: number;
     lineTotal: number;
+    /** Main + gallery URLs (up to 3 used on the packing slip). */
+    imageUrls: string[];
   }[];
   subtotal: number;
   grandTotal: number;

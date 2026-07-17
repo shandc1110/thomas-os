@@ -45,8 +45,14 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="mx-auto min-h-full w-full max-w-3xl px-4">
+    <main className="relative mx-auto min-h-full w-full max-w-3xl px-4">
       <RecoveryRedirect />
+      <Link
+        href="/admin/login"
+        className="absolute right-4 top-4 z-10 inline-flex min-h-9 items-center rounded-full bg-linen px-4 text-xs font-semibold text-espresso ring-1 ring-sand transition hover:bg-sand/50"
+      >
+        Admin Login
+      </Link>
       <header className="pt-8 pb-8 text-center">
         <div className="mx-auto mb-5 flex items-center justify-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -66,12 +72,6 @@ export default function Home() {
           Handpicked pieces, ready to order. Add your favourites to the basket and
           check out.
         </p>
-        <Link
-          href="/admin/login"
-          className="mt-6 inline-flex min-h-11 items-center rounded-full bg-linen px-6 text-sm font-semibold text-espresso ring-1 ring-sand transition hover:bg-sand/50"
-        >
-          Admin Login
-        </Link>
       </header>
 
       {error ? (

@@ -8,6 +8,7 @@ export type Product = {
   barcode: string | null;
   price: number | null;
   retail_price: number | null;
+  shopify_price: number | null;
   cost_price: number | null;
   image_url: string | null;
   gallery_images: string[];

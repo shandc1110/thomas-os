@@ -111,12 +111,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: BRAND.colors.sand,
     paddingVertical: 8,
+    alignItems: "center",
   },
-  colItem: { flex: 3 },
-  colSku: { flex: 1.2, textAlign: "center" },
-  colQty: { flex: 0.6, textAlign: "center" },
-  colPrice: { flex: 1.2, textAlign: "right" },
-  colTotal: { flex: 1.2, textAlign: "right" },
+  colImage: { width: 72, marginRight: 8 },
+  thumbRow: { flexDirection: "row" },
+  thumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 4,
+    objectFit: "cover",
+    marginRight: 2,
+  },
+  colItem: { flex: 2.4 },
+  colSku: { flex: 1.1, textAlign: "center" },
+  colQty: { flex: 0.55, textAlign: "center" },
+  colPrice: { flex: 1.1, textAlign: "right" },
+  colTotal: { flex: 1.1, textAlign: "right" },
   thText: {
     fontSize: 8,
     letterSpacing: 1,
@@ -180,9 +190,10 @@ const styles = StyleSheet.create({
 type PackingSlipProps = {
   data: PackingSlipData;
   logoSrc: string;
+  itemImages?: Record<number, string[]>;
 };
 
-export function PackingSlipDocument({ data, logoSrc }: PackingSlipProps) {
+export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingSlipProps) {
   const currency = data.currency;
 
   return (
@@ -242,25 +253,41 @@ export function PackingSlipDocument({ data, logoSrc }: PackingSlipProps) {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Items</Text>
           <View style={styles.tableHeader}>
+            <Text style={[styles.thText, styles.colImage]}>Photo</Text>
             <Text style={[styles.thText, styles.colItem]}>Item</Text>
             <Text style={[styles.thText, styles.colSku]}>SKU</Text>
             <Text style={[styles.thText, styles.colQty]}>Qty</Text>
             <Text style={[styles.thText, styles.colPrice]}>Unit</Text>
             <Text style={[styles.thText, styles.colTotal]}>Subtotal</Text>
           </View>
-          {data.items.map((item, index) => (
-            <View key={index} style={styles.tableRow}>
-              <Text style={[styles.tdText, styles.colItem]}>{item.name}</Text>
-              <Text style={[styles.tdMuted, styles.colSku]}>{item.sku ?? "—"}</Text>
-              <Text style={[styles.tdText, styles.colQty]}>{item.quantity}</Text>
-              <Text style={[styles.tdText, styles.colPrice]}>
-                {formatOrderPrice(item.unitPrice, currency)}
-              </Text>
-              <Text style={[styles.tdText, styles.colTotal]}>
-                {formatOrderPrice(item.lineTotal, currency)}
-              </Text>
-            </View>
-          ))}
+          {data.items.map((item, index) => {
+            const images = itemImages[index] ?? [];
+            return (
+              <View key={index} style={styles.tableRow} wrap={false}>
+                <View style={styles.colImage}>
+                  {images.length > 0 ? (
+                    <View style={styles.thumbRow}>
+                      {images.map((src, i) => (
+                        // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image
+                        <Image key={i} src={src} style={styles.thumb} />
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.tdMuted}>—</Text>
+                  )}
+                </View>
+                <Text style={[styles.tdText, styles.colItem]}>{item.name}</Text>
+                <Text style={[styles.tdMuted, styles.colSku]}>{item.sku ?? "—"}</Text>
+                <Text style={[styles.tdText, styles.colQty]}>{item.quantity}</Text>
+                <Text style={[styles.tdText, styles.colPrice]}>
+                  {formatOrderPrice(item.unitPrice, currency)}
+                </Text>
+                <Text style={[styles.tdText, styles.colTotal]}>
+                  {formatOrderPrice(item.lineTotal, currency)}
+                </Text>
+              </View>
+            );
+          })}
 
           <View style={styles.totalsSection}>
             <View style={styles.totalRow}>

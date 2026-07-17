@@ -33,6 +33,11 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
   const [order, setOrder] = useState<OrderWithItems | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<"fulfill" | "cancel" | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     params.then((p) => setOrderId(p.id));
@@ -81,6 +86,44 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
     pushToShopify,
   } = useShopify(orderId ?? "", shopifySynced, order?.shopify_admin_url ?? null);
 
+  async function runOrderAction(action: "fulfill" | "cancel") {
+    if (!orderId) return;
+    const confirmMsg =
+      action === "cancel"
+        ? "Cancel this order and restore stock?"
+        : "Mark this order as fulfilled?";
+    if (!window.confirm(confirmMsg)) return;
+
+    setActionLoading(action);
+    setActionMessage(null);
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const result = (await response.json()) as {
+        success: boolean;
+        order?: OrderWithItems;
+        error?: string;
+      };
+      if (!response.ok || !result.success || !result.order) {
+        setActionMessage({ type: "error", message: result.error ?? "Action failed." });
+        return;
+      }
+      setOrder(result.order);
+      setActionMessage({
+        type: "success",
+        message:
+          action === "cancel" ? "Order cancelled. Stock restored." : "Order marked as fulfilled.",
+      });
+    } catch {
+      setActionMessage({ type: "error", message: "Network error. Please try again." });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto w-full max-w-3xl px-4 py-20">
@@ -104,7 +147,15 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
     );
   }
 
-  const isReady = order.fulfilment_status === "ready" || synced;
+  const isCancelled =
+    order.fulfilment_status === "cancelled" || order.warehouse_status === "cancelled";
+  const isFulfilled =
+    order.fulfilment_status === "fulfilled" ||
+    order.warehouse_status === "shipped" ||
+    order.warehouse_status === "delivered";
+  const isReady = !isCancelled && !isFulfilled && (order.fulfilment_status === "ready" || synced);
+  const canCancel = !isCancelled && !isFulfilled;
+  const canFulfill = !isCancelled && !isFulfilled;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-16">
@@ -117,12 +168,24 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
         </Link>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            isReady
-              ? "bg-green-50 text-green-800 ring-1 ring-green-200"
-              : "bg-linen text-muted ring-1 ring-sand"
+            isCancelled
+              ? "bg-red-50 text-red-800 ring-1 ring-red-200"
+              : isFulfilled
+                ? "bg-green-50 text-green-800 ring-1 ring-green-200"
+                : isReady
+                  ? "bg-green-50 text-green-800 ring-1 ring-green-200"
+                  : "bg-linen text-muted ring-1 ring-sand"
           }`}
         >
-          {formatFulfilmentStatus(isReady ? "ready" : order.fulfilment_status)}
+          {formatFulfilmentStatus(
+            isCancelled
+              ? "cancelled"
+              : isFulfilled
+                ? "fulfilled"
+                : isReady
+                  ? "ready"
+                  : order.fulfilment_status,
+          )}
         </span>
       </header>
 
@@ -176,12 +239,37 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
               Open Shopify
             </a>
           )}
+
+          {canFulfill && (
+            <button
+              type="button"
+              onClick={() => runOrderAction("fulfill")}
+              disabled={actionLoading !== null}
+              className="rounded-full bg-green-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionLoading === "fulfill" ? "Marking…" : "Mark as Fulfilled"}
+            </button>
+          )}
+
+          {canCancel && (
+            <button
+              type="button"
+              onClick={() => runOrderAction("cancel")}
+              disabled={actionLoading !== null}
+              className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {actionLoading === "cancel" ? "Cancelling…" : "Cancel Order"}
+            </button>
+          )}
         </div>
 
         <div className="mt-3 space-y-2">
           {pdfError && <Notification type="error" message={pdfError} />}
           {shopifyError && <Notification type="error" message={shopifyError} />}
           {shopifySuccess && <Notification type="success" message={shopifySuccess} />}
+          {actionMessage && (
+            <Notification type={actionMessage.type} message={actionMessage.message} />
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

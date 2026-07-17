@@ -25,7 +25,7 @@ export default function AdminOrdersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bulkLoading, setBulkLoading] = useState<"pdf" | "shopify" | null>(null);
+  const [bulkLoading, setBulkLoading] = useState<"pdf" | "shopify" | "fulfill" | null>(null);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
@@ -117,6 +117,54 @@ export default function AdminOrdersPage() {
     setBulkLoading(null);
   }
 
+  async function handleBulkFulfill() {
+    const eligible = selectedOrders.filter(
+      (o) =>
+        o.fulfilment_status !== "fulfilled" &&
+        o.fulfilment_status !== "cancelled" &&
+        o.warehouse_status !== "shipped" &&
+        o.warehouse_status !== "delivered" &&
+        o.warehouse_status !== "cancelled",
+    );
+    if (eligible.length === 0) {
+      setBulkMessage("None of the selected orders can be marked fulfilled.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Mark ${eligible.length} order${eligible.length === 1 ? "" : "s"} as fulfilled?`,
+      )
+    ) {
+      return;
+    }
+
+    setBulkLoading("fulfill");
+    setBulkMessage(null);
+    setError(null);
+    let succeeded = 0;
+    let failed = 0;
+    for (const order of eligible) {
+      try {
+        const response = await fetch(`/api/orders/${order.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "fulfill" }),
+        });
+        const result = (await response.json()) as { success: boolean };
+        if (response.ok && result.success) succeeded++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+    await loadOrders();
+    setSelected(new Set());
+    setBulkMessage(
+      `Marked ${succeeded} order${succeeded === 1 ? "" : "s"} fulfilled${failed > 0 ? `, ${failed} failed` : ""}.`,
+    );
+    setBulkLoading(null);
+  }
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 pb-16">
       <header className="flex items-center justify-between pt-8 pb-6">
@@ -149,6 +197,14 @@ export default function AdminOrdersPage() {
             className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-espresso ring-1 ring-sand disabled:opacity-60"
           >
             {bulkLoading === "shopify" ? "Pushing…" : "Push to Shopify"}
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkFulfill}
+            disabled={bulkLoading !== null}
+            className="rounded-full bg-green-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-60"
+          >
+            {bulkLoading === "fulfill" ? "Marking…" : "Mark Fulfilled"}
           </button>
           <button
             type="button"
@@ -222,8 +278,24 @@ export default function AdminOrdersPage() {
             {orders.map((order) => {
               const orderNumber = order.order_number ?? String(order.id);
               const shopifySynced = Boolean(order.shopify_draft_order_id);
-              const isReady = order.fulfilment_status === "ready" || shopifySynced;
+              const isCancelled =
+                order.fulfilment_status === "cancelled" || order.warehouse_status === "cancelled";
+              const isFulfilled =
+                order.fulfilment_status === "fulfilled" ||
+                order.warehouse_status === "shipped" ||
+                order.warehouse_status === "delivered";
+              const isReady =
+                !isCancelled &&
+                !isFulfilled &&
+                (order.fulfilment_status === "ready" || shopifySynced);
               const isChecked = selected.has(String(order.id));
+              const statusKey = isCancelled
+                ? "cancelled"
+                : isFulfilled
+                  ? "fulfilled"
+                  : isReady
+                    ? "ready"
+                    : order.fulfilment_status;
 
               return (
                 <li
@@ -273,12 +345,14 @@ export default function AdminOrdersPage() {
                   <div>
                     <span
                       className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        isReady
-                          ? "bg-green-50 text-green-800 ring-1 ring-green-200"
-                          : "bg-linen text-muted ring-1 ring-sand"
+                        isCancelled
+                          ? "bg-red-50 text-red-800 ring-1 ring-red-200"
+                          : isFulfilled || isReady
+                            ? "bg-green-50 text-green-800 ring-1 ring-green-200"
+                            : "bg-linen text-muted ring-1 ring-sand"
                       }`}
                     >
-                      {formatFulfilmentStatus(isReady ? "ready" : order.fulfilment_status)}
+                      {formatFulfilmentStatus(statusKey)}
                     </span>
                   </div>
                 </li>

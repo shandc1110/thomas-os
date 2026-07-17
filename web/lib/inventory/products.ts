@@ -231,6 +231,7 @@ export async function upsertProduct(
     wholesale_price: input.wholesale_price ?? null,
     retail_price: input.retail_price ?? input.price ?? null,
     price: input.retail_price ?? input.price ?? null,
+    shopify_price: input.shopify_price ?? null,
     currency: input.currency ?? "CNY",
     status: input.status ?? "active",
     active: input.status !== "discontinued" && input.active !== false,
@@ -279,6 +280,71 @@ export async function updateProductPresell(
   return { product: mapProductRow(data), error: null };
 }
 
+export async function updateProductPricing(
+  supabase: SupabaseClient,
+  productId: string,
+  input: {
+    cost_price?: number | null;
+    price?: number | null;
+    retail_price?: number | null;
+    shopify_price?: number | null;
+  },
+): Promise<{ product: ProductMaster | null; error: string | null }> {
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if ("cost_price" in input) {
+    payload.cost_price = input.cost_price ?? null;
+  }
+  if ("price" in input) {
+    payload.price = input.price ?? null;
+  }
+  if ("retail_price" in input) {
+    payload.retail_price = input.retail_price ?? null;
+  }
+  if ("shopify_price" in input) {
+    payload.shopify_price = input.shopify_price ?? null;
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .update(payload)
+    .eq("id", productId)
+    .select()
+    .single();
+
+  if (error) return { product: null, error: error.message };
+  return { product: mapProductRow(data), error: null };
+}
+
+export async function updateProductShipping(
+  supabase: SupabaseClient,
+  productId: string,
+  input: {
+    weight_grams: number | null;
+    length_mm: number | null;
+    width_mm: number | null;
+    height_mm: number | null;
+  },
+): Promise<{ product: ProductMaster | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from("products")
+    .update({
+      weight_grams: input.weight_grams,
+      length_mm: input.length_mm,
+      width_mm: input.width_mm,
+      height_mm: input.height_mm,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", productId)
+    .select()
+    .single();
+
+  if (error) return { product: null, error: error.message };
+  return { product: mapProductRow(data), error: null };
+}
+
 function mapProductRow(row: Record<string, unknown>): ProductMaster {
   return {
     id: row.id as string | number,
@@ -298,6 +364,7 @@ function mapProductRow(row: Record<string, unknown>): ProductMaster {
     wholesale_price: row.wholesale_price != null ? Number(row.wholesale_price) : null,
     retail_price: row.retail_price != null ? Number(row.retail_price) : null,
     price: row.price != null ? Number(row.price) : null,
+    shopify_price: row.shopify_price != null ? Number(row.shopify_price) : null,
     currency: (row.currency as string | null) ?? "CNY",
     status: (row.status as ProductMaster["status"]) ?? "active",
     active: (row.active as boolean | null) ?? true,

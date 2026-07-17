@@ -19,7 +19,10 @@ export type ProductMaster = {
   cost_price: number | null;
   wholesale_price: number | null;
   retail_price: number | null;
+  /** Console / order-portal shop price (CNY). */
   price: number | null;
+  /** Shopify storefront price (CNY) — independent of console price. */
+  shopify_price: number | null;
   currency: string | null;
   status: ProductStatus | null;
   active: boolean | null;
