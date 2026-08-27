@@ -1,2 +1,7 @@
 .vercel
 .env.vercel.production
+
+# Brand asset source ZIPs — commit extracted files under web/public/brand/, not archives
+Chosen_by_Chloe_Brand_System_V4_Logo_Assets.zip
+*_Brand_System*_Logo_Assets.zip
+_v4_extract/

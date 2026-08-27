@@ -16,15 +16,6 @@ type ProductCardProps = {
   product: Product;
 };
 
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((word) => word.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 export default function ProductCard({ product }: ProductCardProps) {
   const { addItem, getQuantity } = useCart();
   const [selected, setSelected] = useState(1);
@@ -34,7 +25,6 @@ export default function ProductCard({ product }: ProductCardProps) {
   const sellable = getSellableStock(product);
   const presellOnly = isPresellOnly(product);
   const soldOut = sellable <= 0;
-  const lowStock = !soldOut && onHand > 0 && onHand <= 3;
   const arrivalLabel = formatExpectedArrival(product.expected_arrival_month);
 
   const inCart = getQuantity(product.id);
@@ -58,76 +48,61 @@ export default function ProductCard({ product }: ProductCardProps) {
   }
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl bg-linen shadow-sm ring-1 ring-sand/70 transition-shadow duration-300 hover:shadow-md">
-      <div className="relative aspect-square w-full overflow-hidden rounded-t-2xl bg-white p-3">
+    <div className="group flex flex-col">
+      <div className="relative aspect-square w-full overflow-hidden bg-white">
         {product.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.image_url}
             alt={product.name}
-            className={`h-full w-full rounded-xl object-cover transition-transform duration-500 group-hover:scale-105 ${
-              soldOut ? "opacity-60 grayscale" : ""
+            className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.02] ${
+              soldOut ? "opacity-50" : ""
             }`}
             loading="lazy"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-sand">
-            <span className="font-serif text-4xl text-cocoa/70">
-              {initials(product.name)}
-            </span>
+          <div className="flex h-full w-full items-center justify-center bg-sand/40">
+            <span className="text-xs uppercase tracking-widest text-muted">No image</span>
           </div>
         )}
 
         {soldOut && (
-          <div className="absolute inset-0 flex items-center justify-center bg-espresso/25 backdrop-blur-[1px]">
-            <span className="rounded-full bg-espresso/90 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-cream">
-              Sold out
-            </span>
+          <div className="absolute inset-x-0 bottom-0 bg-charcoal/80 px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-ivory">
+            Sold out
           </div>
         )}
 
-        {presellOnly && arrivalLabel && (
-          <span className="absolute left-3 top-3 rounded-full bg-clay/95 px-3 py-1 text-[11px] font-semibold text-cream shadow-sm">
+        {presellOnly && arrivalLabel && !soldOut && (
+          <p className="absolute left-0 top-0 bg-ivory/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-charcoal">
             Pre-order · {arrivalLabel}
-          </span>
-        )}
-
-        {lowStock && (
-          <span className="absolute left-3 top-3 rounded-full bg-cocoa/90 px-3 py-1 text-[11px] font-medium text-cream shadow-sm">
-            Only {onHand} left
-          </span>
+          </p>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex flex-1 flex-col gap-1">
-          <h3 className="font-serif text-lg leading-snug text-espresso">
-            {product.name}
-          </h3>
-          {product.description && (
-            <p className="line-clamp-2 text-sm text-muted">{product.description}</p>
-          )}
-          {presellOnly && arrivalLabel && (
-            <p className="text-xs font-medium text-clay">
-              Ships when stock arrives ({arrivalLabel})
+      <div className="flex flex-1 flex-col gap-3 pt-3">
+        <div className="space-y-1">
+          {product.brand ? (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sage">
+              {product.brand}
             </p>
+          ) : null}
+          <h3 className="font-serif text-lg leading-snug text-charcoal">{product.name}</h3>
+          {presellOnly && arrivalLabel && (
+            <p className="text-xs text-muted">Ships {arrivalLabel}</p>
           )}
-          {!presellOnly && presellStock > 0 && arrivalLabel && (
+          {!presellOnly && !soldOut && presellStock > 0 && arrivalLabel && (
             <p className="text-xs text-muted">
-              +{presellStock} pre-order for {arrivalLabel}
+              +{presellStock} incoming ({arrivalLabel})
             </p>
           )}
         </div>
 
-        <div className="flex items-end justify-between">
-          <span className="text-lg font-semibold text-ink">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-base font-semibold text-charcoal">
             {formatPrice(product.price, product.currency)}
           </span>
-          {!soldOut && (
-            <span className="text-xs text-muted">
-              {onHand > 0 ? `${onHand} in stock` : "Pre-order"}
-              {presellStock > 0 && onHand > 0 ? ` · ${presellStock} incoming` : ""}
-            </span>
+          {!soldOut && onHand > 0 && onHand <= 3 && (
+            <span className="text-xs text-muted">Only {onHand} left</span>
           )}
         </div>
 
@@ -135,23 +110,23 @@ export default function ProductCard({ product }: ProductCardProps) {
           <button
             type="button"
             disabled
-            className="w-full cursor-not-allowed rounded-full bg-sand py-2.5 text-sm font-semibold uppercase tracking-wide text-muted"
+            className="w-full cursor-not-allowed border border-sand py-2.5 text-sm font-medium text-muted"
           >
             Sold out
           </button>
         ) : (
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between rounded-full bg-linen p-1">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between border border-sand bg-white p-1">
               <button
                 type="button"
                 onClick={decrement}
                 disabled={clampedSelected <= 1}
                 aria-label={`Decrease quantity of ${product.name}`}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg font-semibold text-cocoa shadow-sm transition-colors hover:bg-cream disabled:opacity-40 disabled:hover:bg-white"
+                className="flex h-9 w-9 items-center justify-center text-lg text-charcoal transition hover:bg-ivory disabled:opacity-40"
               >
                 &minus;
               </button>
-              <span className="min-w-8 text-center text-base font-semibold text-espresso">
+              <span className="min-w-8 text-center text-sm font-semibold text-charcoal">
                 {clampedSelected}
               </span>
               <button
@@ -159,7 +134,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 onClick={increment}
                 disabled={clampedSelected >= maxSelectable}
                 aria-label={`Increase quantity of ${product.name}`}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-cocoa text-lg font-semibold text-cream shadow-sm transition-colors hover:bg-espresso disabled:opacity-40 disabled:hover:bg-cocoa"
+                className="flex h-9 w-9 items-center justify-center bg-charcoal text-lg text-ivory transition hover:bg-charcoal/90 disabled:opacity-40"
               >
                 +
               </button>
@@ -169,13 +144,13 @@ export default function ProductCard({ product }: ProductCardProps) {
               type="button"
               onClick={handleAdd}
               disabled={!canAdd}
-              className="w-full rounded-full bg-cocoa py-2.5 text-sm font-semibold uppercase tracking-wide text-cream shadow-sm transition-colors hover:bg-espresso disabled:cursor-not-allowed disabled:bg-sand disabled:text-muted"
+              className="w-full bg-charcoal py-2.5 text-sm font-semibold tracking-wide text-ivory transition hover:bg-charcoal/90 disabled:cursor-not-allowed disabled:bg-sand disabled:text-muted"
             >
-              {canAdd ? (presellOnly ? "Pre-order" : "Add to cart") : "Max in cart"}
+              {canAdd ? (presellOnly ? "Pre-order" : "Add to basket") : "Max in basket"}
             </button>
 
             {inCart > 0 && (
-              <p className="text-center text-xs text-clay">{inCart} in your cart</p>
+              <p className="text-center text-xs text-muted">{inCart} in your basket</p>
             )}
           </div>
         )}

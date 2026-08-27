@@ -368,6 +368,7 @@ function mapProductRow(row: Record<string, unknown>): ProductMaster {
     currency: (row.currency as string | null) ?? "CNY",
     status: (row.status as ProductMaster["status"]) ?? "active",
     active: (row.active as boolean | null) ?? true,
+    assortment_status: (row.assortment_status as ProductMaster["assortment_status"]) ?? null,
     image_url: (row.image_url as string | null) ?? null,
     gallery_images: (row.gallery_images as string[]) ?? [],
     tags: (row.tags as string[]) ?? [],

@@ -92,7 +92,7 @@ export function BrandCatalog({ products, enableBrowse = false }: BrandCatalogPro
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name, SKU…"
-              className="w-full rounded-2xl border-0 bg-white px-4 py-3 text-sm text-espresso shadow-sm ring-1 ring-sand/70 placeholder:text-muted outline-none focus:ring-2 focus:ring-cocoa/40"
+              className="w-full border border-sand bg-white px-4 py-3 text-sm text-charcoal placeholder:text-muted outline-none focus:border-sage"
               autoComplete="off"
             />
           </label>
@@ -168,14 +168,14 @@ function CategoryChip({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold tracking-wide transition ${
+      className={`shrink-0 border px-3 py-1.5 text-xs font-semibold tracking-wide transition ${
         active
-          ? "bg-cocoa text-cream"
-          : "bg-white text-espresso ring-1 ring-sand/80 hover:bg-linen"
+          ? "border-charcoal bg-charcoal text-ivory"
+          : "border-sand bg-white text-charcoal hover:border-sage"
       }`}
     >
       {label}
-      <span className={`ml-1.5 ${active ? "text-cream/70" : "text-muted"}`}>{count}</span>
+      <span className={`ml-1.5 ${active ? "text-ivory/70" : "text-muted"}`}>{count}</span>
     </button>
   );
 }

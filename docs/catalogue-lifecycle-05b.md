@@ -243,7 +243,11 @@ storefront eligibility
 
 ### Migration Proposal
 
-**NOT EXECUTED in Sprint 05B.** For explicit approval in a future sprint.
+**Implemented in Sprint 05C** — see [`assortment-status-05c.md`](assortment-status-05c.md) and `web/supabase/migrations/0014_assortment_status.sql`.
+
+**NOT applied to production** until explicitly deployed.
+
+Original proposal (05B):
 
 ```sql
 -- PROPOSAL ONLY — do not run without approval
@@ -251,12 +255,26 @@ storefront eligibility
 alter table public.products
   add column if not exists assortment_status text
     check (assortment_status in ('active', 'paused', 'retired'));
+```
 
+**05C implementation differences:**
+
+| Item | 05B proposal | 05C actual |
+|------|--------------|------------|
+| NULL allowed | Implied | Explicit CHECK: `IS NULL OR IN (...)` |
+| Default | No mass `active` | No column default |
+| Index | Full | **Partial** `WHERE assortment_status IS NOT NULL` |
+| Data backfill | None | None — no `UPDATE` |
+| Constraint name | — | `products_assortment_status_check` |
+| Index name | `products_assortment_status_idx` | Same |
+
+```sql
 comment on column public.products.assortment_status is
   'Chosen by Chloe selling assortment: active | paused | retired. Distinct from inventory availability.';
 
 create index if not exists products_assortment_status_idx
-  on public.products (assortment_status);
+  on public.products (assortment_status)
+  where assortment_status is not null;
 
 -- Optional future audit support (separate proposal):
 -- assortment_status_reason text null

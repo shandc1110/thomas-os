@@ -10,6 +10,7 @@ import {
   formatWeightKg,
 } from "@/lib/weight";
 import type { ProductMaster, InventoryBalance, ProductLedgerEntry } from "@/types/inventory";
+import { AssortmentPanel } from "@/components/inventory/assortment/AssortmentPanel";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -382,6 +383,8 @@ export default function ProductDetailPage({ params }: PageProps) {
       <ShippingPanel product={product} onSaved={setProduct} />
 
       <PresellPanel product={product} onSaved={setProduct} />
+
+      <AssortmentPanel key={String(product.id)} product={product} onSaved={setProduct} />
 
       {balances.length > 0 && (
         <section className="rounded-2xl bg-white p-5 ring-1 ring-sand/60">

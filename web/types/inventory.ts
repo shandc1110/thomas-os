@@ -1,4 +1,5 @@
 import type { StockMovement } from "./movement";
+import type { AssortmentStatus } from "@/lib/types";
 
 export type ProductStatus = "active" | "draft" | "discontinued";
 
@@ -26,6 +27,8 @@ export type ProductMaster = {
   currency: string | null;
   status: ProductStatus | null;
   active: boolean | null;
+  /** Commercial assortment — NULL = not yet reviewed. Not used for storefront filtering yet. */
+  assortment_status: AssortmentStatus | null;
   image_url: string | null;
   gallery_images: string[];
   tags: string[];

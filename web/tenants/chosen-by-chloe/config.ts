@@ -1,22 +1,23 @@
 import type { TenantConfig } from "@/lib/thomas/tenant/types";
+import { cbcV4Assets, cbcV4Brand, cbcV4Colors } from "@/lib/brand/chosen-by-chloe";
 
-/** Chosen by Chloe — first tenant on Thomas OS. */
+/** Chosen by Chloe — first tenant on Thomas OS (Brand System V4). */
 export const chosenByChloeTenant: TenantConfig = {
   slug: "chosen-by-chloe",
   organizationId: "00000000-0000-0000-0000-000000000001",
-  name: "Chosen by Chloe",
+  name: cbcV4Brand.displayName,
   brand: {
-    name: "Chosen by Chloe",
-    tagline: "Curated with Care · Exclusive Value · Proven by Choice",
-    logoUrl:
-      "https://chosenbychloe.com/cdn/shop/files/TopLogo.jpg?v=1764941405&width=160",
+    name: cbcV4Brand.displayName,
+    tagline: cbcV4Brand.tagline,
+    /** PRIMARY MASTER — never replace with CC */
+    logoUrl: cbcV4Assets.logoPrimaryHorizontal,
     colors: {
-      cream: "#faf6f2",
-      espresso: "#3d2f2a",
-      muted: "#6b5b55",
-      clay: "#b08b7d",
-      sand: "#f0e8e4",
-      cocoa: "#2e3a47",
+      cream: cbcV4Colors.warmIvory,
+      espresso: cbcV4Colors.charcoal,
+      muted: "#6b6a66",
+      clay: cbcV4Colors.sage,
+      sand: "#e8dfd2",
+      cocoa: cbcV4Colors.charcoal,
     },
   },
   commerce: {
@@ -29,16 +30,16 @@ export const chosenByChloeTenant: TenantConfig = {
     defaultCurrency: "CNY",
   },
   email: {
-    subjectSuffix: "Chosen by Chloe",
+    subjectSuffix: cbcV4Brand.displayName,
     defaultCc: "dongchen@chosenbychloe.com",
   },
   integrations: {
     shopifyPortalTagPrefix: "portal",
   },
   storefront: {
-    title: "Chosen by Chloe",
-    description: "Order your favourites from Chosen by Chloe.",
-    bannerText:
-      "Chosen by Chloe is now open — carefully chosen by us, beautifully lived by you.",
+    title: cbcV4Brand.displayName,
+    description:
+      "Chosen with a mother's heart for little lives. Things we've tried, loved and chosen — for our little ones, and yours.",
+    bannerText: cbcV4Brand.bannerText,
   },
 };

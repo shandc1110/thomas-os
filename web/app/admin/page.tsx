@@ -30,6 +30,12 @@ const MODULES = [
     description: "Products, warehouses, goods receipt, and stock take.",
     icon: "📊",
   },
+  {
+    href: "/admin/integrations/joybuy",
+    title: "Joybuy",
+    description: "Joybuy sales channel — Pending Review, not connected.",
+    icon: "🔗",
+  },
 ];
 
 export default function AdminConsolePage() {

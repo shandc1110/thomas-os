@@ -25,23 +25,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginBottom: 8,
-  },
-  brandLabel: {
-    fontSize: 8,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-    color: BRAND.colors.clay,
-    marginBottom: 4,
-  },
-  title: {
-    fontFamily: "Times-Roman",
-    fontSize: 22,
-    color: BRAND.colors.espresso,
-    marginBottom: 4,
+    width: 180,
+    height: 48,
+    marginBottom: 10,
   },
   tagline: {
     fontSize: 8,
@@ -200,9 +186,8 @@ export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingS
     <Document title={`Packing Slip ${data.orderNumber}`} author={BRAND.name}>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt */}
           <Image src={logoSrc} style={styles.logo} />
-          <Text style={styles.brandLabel}>{BRAND.name}</Text>
-          <Text style={styles.title}>{BRAND.name}</Text>
           <Text style={styles.tagline}>{BRAND.tagline}</Text>
         </View>
 

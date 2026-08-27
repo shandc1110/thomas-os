@@ -1,8 +1,10 @@
 import "server-only";
+import fs from "node:fs/promises";
+import path from "node:path";
 import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import type { PackingSlipData } from "@/types/order";
-import { BRAND } from "@/lib/brand";
+import { cbcV4Assets } from "@/lib/brand/chosen-by-chloe";
 import { PackingSlipDocument } from "@/components/pdf/PackingSlip";
 
 async function fetchAsDataUri(url: string): Promise<string | null> {
@@ -18,16 +20,31 @@ async function fetchAsDataUri(url: string): Promise<string | null> {
   }
 }
 
-async function fetchLogoAsDataUri(): Promise<string> {
-  const dataUri = await fetchAsDataUri(BRAND.logoUrl);
-  return dataUri ?? BRAND.logoUrl;
+/** Load V4 primary wordmark from /public for PDF embedding (no network). */
+async function loadPrimaryLogoDataUri(): Promise<string> {
+  const relative = cbcV4Assets.logoPrimaryHorizontal.replace(/^\//, "");
+  const filePath = path.join(process.cwd(), "public", relative);
+  try {
+    const buffer = await fs.readFile(filePath);
+    return `data:image/png;base64,${buffer.toString("base64")}`;
+  } catch {
+    // Fallback: try absolute URL if public file is unavailable in the runtime.
+    const origin =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+    if (origin) {
+      const remote = await fetchAsDataUri(`${origin}${cbcV4Assets.logoPrimaryHorizontal}`);
+      if (remote) return remote;
+    }
+    return cbcV4Assets.logoPrimaryHorizontal;
+  }
 }
 
 export type PackingSlipItemImages = Record<number, string[]>;
 
 /** Generate a branded A4 packing slip PDF for the given order data. */
 export async function generatePackingSlipPdf(data: PackingSlipData): Promise<Buffer> {
-  const logoSrc = await fetchLogoAsDataUri();
+  const logoSrc = await loadPrimaryLogoDataUri();
 
   const itemImages: PackingSlipItemImages = {};
   await Promise.all(

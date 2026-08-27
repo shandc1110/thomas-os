@@ -23,6 +23,7 @@ export function mapProduct(row: Record<string, unknown>): Product {
     expected_arrival_month: (row.expected_arrival_month as string | null) ?? null,
     active: (row.active as boolean | null) ?? true,
     status: (row.status as string | null) ?? null,
+    assortment_status: (row.assortment_status as Product["assortment_status"]) ?? null,
     weight_grams: (row.weight_grams as number | null) ?? null,
     length_mm: (row.length_mm as number | null) ?? null,
     width_mm: (row.width_mm as number | null) ?? null,

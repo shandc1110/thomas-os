@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrandCatalog } from "@/components/brands/BrandCatalog";
 import { BrandHero } from "@/components/brands/BrandHero";
+import { ShopFooter } from "@/components/shop/ShopFooter";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import {
   getActiveBrands,
@@ -10,6 +11,7 @@ import {
   getBrandBySlug,
 } from "@/lib/brands";
 import { fetchBrandProducts } from "@/lib/brands/catalog";
+import { cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +35,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   const brand = getBrandBySlug(slug);
   if (!brand || !brand.active) {
-    return { title: "Brand not found | Chosen by Chloe" };
+    return { title: `Brand not found | ${cbcV4Brand.displayName}` };
   }
 
   const canonical = `${siteOrigin()}/brands/${brand.slug}`;
@@ -62,29 +64,32 @@ export default async function BrandPage({ params }: PageProps) {
   const otherBrands = getActiveBrands().filter((b) => b.slug !== brand.slug);
 
   return (
-    <main className="relative mx-auto min-h-full w-full max-w-3xl px-4 pb-8">
-      <ShopHeader />
-      <BrandHero brand={brand} productCount={products.length} />
-      <BrandCatalog
-        products={products}
-        enableBrowse={brand.slug === "tonies" || brand.slug === "micro-scooters"}
-      />
-      {otherBrands.length > 0 && (
-        <p className="mt-10 pb-6 text-center text-sm text-muted">
-          Looking for something else?{" "}
-          {otherBrands.map((b, i) => (
-            <span key={b.slug}>
-              {i > 0 && (i === otherBrands.length - 1 ? " or " : ", ")}
-              <Link
-                href={`/brands/${b.slug}`}
-                className="font-medium text-cocoa underline-offset-2 hover:underline"
-              >
-                {b.name}
-              </Link>
-            </span>
-          ))}
-        </p>
-      )}
-    </main>
+    <div className="relative min-h-full w-full">
+      <ShopHeader compact />
+      <main className="relative mx-auto w-full max-w-6xl px-4 pb-8 pt-8">
+        <BrandHero brand={brand} productCount={products.length} />
+        <BrandCatalog
+          products={products}
+          enableBrowse={brand.slug === "tonies" || brand.slug === "micro-scooters"}
+        />
+        {otherBrands.length > 0 && (
+          <p className="mt-10 pb-6 text-center text-sm text-muted">
+            Looking for something else?{" "}
+            {otherBrands.map((b, i) => (
+              <span key={b.slug}>
+                {i > 0 && (i === otherBrands.length - 1 ? " or " : ", ")}
+                <Link
+                  href={`/brands/${b.slug}`}
+                  className="font-medium text-charcoal underline-offset-2 hover:underline"
+                >
+                  {b.name}
+                </Link>
+              </span>
+            ))}
+          </p>
+        )}
+      </main>
+      <ShopFooter />
+    </div>
   );
 }

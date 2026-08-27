@@ -35,8 +35,9 @@ Links Supabase Auth users to an organisation. Table exists; application enforcem
 | cost_price, retail_price | numeric | Pricing |
 | stock | integer | Denormalised total (synced from ledger) |
 | low_stock_threshold | integer | Alert trigger |
+| assortment_status | text nullable | `active` \| `paused` \| `retired`; NULL = not reviewed (`0014`) |
 
-Full column list in migration `0006_inventory_warehouse.sql`.
+Full column list in migrations `0006_inventory_warehouse.sql` and `0014_assortment_status.sql`.
 
 ## Orders
 

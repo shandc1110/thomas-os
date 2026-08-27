@@ -35,13 +35,15 @@ export default function StickyCart() {
       <div className="mx-auto max-w-2xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
         <Link
           href="/checkout"
-          className="flex w-full items-center justify-between rounded-full bg-cocoa px-6 py-4 text-cream shadow-lg shadow-espresso/20 transition-colors hover:bg-espresso"
+          className="flex w-full items-center justify-between bg-charcoal px-6 py-4 text-ivory transition-colors hover:bg-charcoal/90"
         >
           <span className="flex items-center gap-2 text-sm font-medium">
             <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-cream/20 px-1.5 text-xs font-semibold">
               {totalItems}
             </span>
-            {totalItems === 1 ? "item" : "items"} &middot; Checkout
+            {totalItems === 1 ? "item" : "items"}
+            <span aria-hidden="true"> · </span>
+            Basket
           </span>
           <span className="text-base font-semibold">
             {formatOrderPrice(displayTotal, displayCurrency)}

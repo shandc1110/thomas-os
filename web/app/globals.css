@@ -1,16 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  /* Palette matched to chosenbychloe.com (cream · blush · slate) */
-  --color-cream: #f8f1e5; /* page base */
-  --color-linen: #fff9f3; /* light surface */
-  --color-blush: #f4dcdc; /* soft pink accent */
-  --color-sand: #ecdfd2; /* warm neutral / borders */
-  --color-clay: #b98c7d; /* muted rose-tan accent text */
-  --color-cocoa: #2e3a47; /* primary action (slate) */
-  --color-espresso: #1f2933; /* darker slate / hover */
-  --color-ink: #2e3a47; /* body text */
-  --color-muted: #8a8f98; /* muted grey-slate */
+  /* CHOSEN by Chloe Brand System V4 — approved core palette */
+  --color-ivory: #f8f1e5; /* Warm Ivory */
+  --color-cream: #f8f1e5; /* alias — Warm Ivory */
+  --color-linen: #ffffff; /* White surfaces */
+  --color-white: #ffffff;
+  --color-sage: #a8b19f;
+  --color-charcoal: #242321;
+  --color-sand: #e8dfd2; /* soft border derived from ivory */
+  --color-clay: #a8b19f; /* map legacy clay → sage */
+  --color-cocoa: #242321; /* map legacy cocoa → charcoal */
+  --color-espresso: #242321;
+  --color-ink: #242321;
+  --color-muted: #6b6a66;
+  --color-blush: #f8f1e5; /* neutralize old pink accent */
 
   --font-sans: var(--font-montserrat);
   --font-serif: var(--font-playfair);
@@ -18,7 +22,7 @@
 
 :root {
   --background: #f8f1e5;
-  --foreground: #2e3a47;
+  --foreground: #242321;
 }
 
 html {
@@ -28,10 +32,10 @@ html {
 body {
   background: var(--background);
   background-image: linear-gradient(
-    133deg,
-    rgba(248, 241, 229, 1) 10%,
-    rgba(255, 249, 243, 1) 48%,
-    rgba(244, 220, 220, 1) 85%
+    160deg,
+    #f8f1e5 0%,
+    #ffffff 48%,
+    #f3eee4 100%
   );
   background-attachment: fixed;
   color: var(--foreground);

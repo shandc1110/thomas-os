@@ -1,3 +1,5 @@
+export type AssortmentStatus = "active" | "paused" | "retired";
+
 export type Product = {
   id: string | number;
   sku: string | null;
@@ -20,6 +22,8 @@ export type Product = {
   expected_arrival_month: string | null;
   active: boolean | null;
   status: string | null;
+  /** Commercial assortment — NULL = not yet reviewed (Sprint 05C). Not used for storefront filtering yet. */
+  assortment_status: AssortmentStatus | null;
   weight_grams: number | null;
   length_mm: number | null;
   width_mm: number | null;

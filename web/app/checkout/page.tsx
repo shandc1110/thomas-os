@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/context/CartContext";
+import { BrandLogo } from "@/components/shop/BrandLogo";
 import { getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate, unitPriceForOrder } from "@/lib/currency";
 import { formatOrderPrice } from "@/lib/format";
 import { STRIPE_PAYMENT_METHOD } from "@/lib/stripe/constants";
@@ -59,6 +60,8 @@ export default function CheckoutPage() {
     const hasGbp = items.some((item) => (item.product.currency ?? "CNY").toUpperCase() === "GBP");
     const hasCny = items.some((item) => (item.product.currency ?? "CNY").toUpperCase() !== "GBP");
     if (hasGbp && !hasCny) {
+      // Sync default checkout currency when the basket is GBP-only.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-shot default from cart contents
       setForm((prev) => (prev.currency === "GBP" ? prev : { ...prev, currency: "GBP" }));
     }
   }, [hydrated, items, currencyTouched]);
@@ -191,14 +194,26 @@ export default function CheckoutPage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pb-16">
-      <header className="flex items-center justify-between pt-8 pb-6">
-        <Link href="/" className="text-sm font-medium text-clay hover:text-cocoa">
-          &larr; Continue shopping
+      <header className="flex items-center justify-between gap-4 border-b border-sand/80 pt-6 pb-5">
+        <Link
+          href="/"
+          className="shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal"
+        >
+          <BrandLogo
+            variant="primary-horizontal"
+            className="h-9 w-auto max-w-[180px] object-contain object-left"
+            priority
+          />
         </Link>
-        <span className="text-xs uppercase tracking-[0.3em] text-muted">Checkout</span>
+        <div className="text-right">
+          <p className="text-xs uppercase tracking-[0.22em] text-muted">Checkout</p>
+          <Link href="/" className="text-xs font-medium text-sage hover:text-charcoal">
+            Continue shopping
+          </Link>
+        </div>
       </header>
 
-      <h1 className="font-serif text-3xl text-espresso">Your order</h1>
+      <h1 className="mt-8 font-serif text-3xl text-charcoal">Your order</h1>
 
       <section className="mt-5 space-y-3">
         {items.map((item) => {

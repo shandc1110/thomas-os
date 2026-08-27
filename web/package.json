@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "import:products": "tsx scripts/import-products.ts",
     "upload:images": "tsx scripts/upload-product-images.ts",
     "match:images": "tsx scripts/match-drive-images.ts",
@@ -35,6 +37,7 @@
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

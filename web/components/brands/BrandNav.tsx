@@ -15,17 +15,17 @@ export function BrandNav({ className = "" }: BrandNavProps) {
   return (
     <nav
       aria-label="Brands"
-      className={`flex flex-wrap items-center justify-center gap-2 ${className}`}
+      className={`flex flex-wrap items-center gap-1 sm:gap-2 ${className}`}
     >
       <Link
         href="/"
-        className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+        className={`px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
           pathname === "/"
-            ? "bg-cocoa text-cream"
-            : "bg-linen text-espresso ring-1 ring-sand hover:bg-sand/50"
+            ? "text-charcoal underline decoration-sage decoration-2 underline-offset-4"
+            : "text-muted hover:text-charcoal"
         }`}
       >
-        All brands
+        Home
       </Link>
       {brands.map((brand) => {
         const href = `/brands/${brand.slug}`;
@@ -34,10 +34,10 @@ export function BrandNav({ className = "" }: BrandNavProps) {
           <Link
             key={brand.slug}
             href={href}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+            className={`px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition ${
               active
-                ? "bg-cocoa text-cream"
-                : "bg-linen text-espresso ring-1 ring-sand hover:bg-sand/50"
+                ? "text-charcoal underline decoration-sage decoration-2 underline-offset-4"
+                : "text-muted hover:text-charcoal"
             }`}
           >
             {brand.name}
