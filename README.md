@@ -1,19 +1,32 @@
-let cart=[];
-fetch('products.json').then(r=>r.json()).then(products=>{
- const container=document.getElementById('products');
- const render=list=>{
-  container.innerHTML='';
-  list.forEach((p,i)=>{
-    const d=document.createElement('div');d.className='card';
-    d.innerHTML=`<img src="${p.image}" alt=""><h3>${p.title}</h3><p>£${p.price}</p><p>Stock: ${p.stock}</p><input class="qty" id="q${i}" type="number" min="1" value="1"><button>Add</button>`;
-    d.querySelector('button').onclick=()=>{const q=+d.querySelector('input').value;cart.push({title:p.title,qty:q});updateCart();};
-    container.appendChild(d);
-  });
- };
- render(products);
- document.getElementById('search').oninput=e=>{
-   const t=e.target.value.toLowerCase();
-   render(products.filter(p=>p.title.toLowerCase().includes(t)));
- };
-});
-function updateCart(){document.getElementById('cartItems').innerHTML=cart.map(i=>`<li>${i.title} x ${i.qty}</li>`).join('');}
+# Thomas OS
+
+**Thomas** is a retail operating system. **Chosen by Chloe** is the first tenant.
+
+The application lives in [`web/`](./web/). See **[web/README.md](./web/README.md)** for setup, environment variables, migrations, and workflows.
+
+## Quick start
+
+```bash
+git clone https://github.com/shandc1110/thomas-os.git
+cd thomas-os/web
+npm install
+cp .env.example .env.local   # fill in secrets
+npm run dev
+```
+
+- Shop: http://localhost:3000  
+- Brands: http://localhost:3000/brands  
+- Admin: http://localhost:3000/admin  
+
+Production: https://chosen-by-chloe-order-portal.vercel.app
+
+## What’s in this repo
+
+| Area | Description |
+|------|-------------|
+| Storefront | Multi-brand shop (Mideer, Tonies, Micro Scooters), cart, Stripe checkout |
+| Pre-order | Sell in-transit stock before warehouse arrival |
+| Admin | Orders, inventory, warehouse pick/pack/dispatch, purchasing |
+| Integrations | Supabase, Stripe, Shopify draft orders, Resend email |
+
+Deploy from the repo root with Vercel (`vercel.json` builds the `web/` Next.js app).

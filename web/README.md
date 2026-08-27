@@ -4,36 +4,37 @@
 
 A mobile-first platform built with **Next.js 16**, **TypeScript**, **Tailwind CSS v4**, and **Supabase** — covering commerce, inventory, warehouse, procurement, and fulfilment.
 
-Customers browse the tenant storefront, add products to cart, and check out. Staff use the Thomas admin console to manage orders, stock, warehouse operations, and purchasing.
+Customers browse brand storefronts, add products to cart, and pay with **Stripe**. Staff use the Thomas admin console to manage orders, stock, warehouse operations, and purchasing.
 
 ## Tech stack
 
 - Next.js 16 (App Router) + React 19
 - TypeScript
 - Tailwind CSS v4
-- Supabase (Postgres + Storage)
-- @react-pdf/renderer (server-side packing slip PDFs)
-- Shopify Admin GraphQL API (draft order creation)
+- Supabase (Postgres + Auth + Storage)
+- Stripe Checkout (card payments)
+- @react-pdf/renderer (packing slip PDFs)
+- Shopify Admin GraphQL API (draft order fulfilment)
+- Resend (order confirmation emails)
 
 ## Prerequisites
 
 - Node.js 20+ (LTS recommended)
-- A Supabase project with `products`, `orders`, and `order_items` tables
+- A Supabase project with migrations applied (see below)
+- Stripe account (Checkout + webhook)
 - A Shopify store with Admin API access (for fulfilment sync)
 
-## Getting started (including on a new machine)
+## Getting started
 
 1. **Clone and install**
 
    ```bash
-   git clone https://github.com/shandc1110/chosen-by-chloe-order-portal.git
-   cd chosen-by-chloe-order-portal/web
+   git clone https://github.com/shandc1110/thomas-os.git
+   cd thomas-os/web
    npm install
    ```
 
 2. **Configure environment variables**
-
-   Copy the example file and fill in your keys:
 
    ```bash
    cp .env.example .env.local
@@ -43,29 +44,36 @@ Customers browse the tenant storefront, add products to cart, and check out. Sta
    | --- | --- |
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (public) |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publishable/anon key (public) |
-   | `SUPABASE_SERVICE_ROLE_KEY` | **Secret** server key — required for orders, admin APIs, and scripts |
+   | `SUPABASE_SERVICE_ROLE_KEY` | **Secret** server key — orders, admin APIs, scripts |
+   | `THOMAS_TENANT_SLUG` | Active tenant (default `chosen-by-chloe`) |
    | `RESEND_API_KEY` | Order confirmation emails (optional) |
    | `ORDER_EMAIL_FROM` | Sender address for confirmation emails |
    | `ORDER_EMAIL_CC` | CC on every order confirmation |
    | `SHOPIFY_STORE` | Shopify store subdomain (e.g. `chosenbychloe`) |
-   | `SHOPIFY_ADMIN_TOKEN` | Admin API access token with `write_draft_orders` scope |
+   | `SHOPIFY_CLIENT_ID` / `SHOPIFY_CLIENT_SECRET` | Dev Dashboard app credentials (preferred) |
+   | `SHOPIFY_ADMIN_TOKEN` | Legacy static Admin token (`shpat_…`) if not using client credentials |
    | `SHOPIFY_API_VERSION` | GraphQL API version (defaults to `2025-01`) |
-
-   Get the `service_role` key from Supabase → Project Settings → API.
+   | `STRIPE_SECRET_KEY` | Stripe secret key (`sk_test_…` / `sk_live_…`) |
+   | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret for `checkout.session.completed` |
+   | `NEXT_PUBLIC_SITE_URL` | Public site URL for Stripe redirects (production) |
 
 3. **Apply database migrations**
 
-   Run all SQL files in `supabase/migrations/` against your Supabase database **in order** (0001 through 0009). Key milestones:
+   Run SQL files in `supabase/migrations/` **in order** (0001 → 0012):
 
    | Migration | Purpose |
    |-----------|---------|
+   | 0001–0005 | Orders, checkout fields, fulfilment, customer fields |
    | 0006 | Inventory & warehouse ledger |
    | 0007 | Pick, pack, dispatch |
    | 0008 | Purchasing |
    | 0009 | Organizations & tenant scoping |
+   | 0010 | Pre-sell / pre-order |
+   | 0011 | Shopify price fields |
+   | 0012 | Payments (Stripe) |
 
    ```bash
-   npx tsx scripts/apply-migration.ts supabase/migrations/0009_platform_foundation.sql
+   npx tsx scripts/apply-migration.ts supabase/migrations/0012_payments.sql
    ```
 
 4. **Run the dev server**
@@ -74,13 +82,43 @@ Customers browse the tenant storefront, add products to cart, and check out. Sta
    npm run dev
    ```
 
-   - Shop: [http://localhost:3000](http://localhost:3000)
-   - Fulfilment dashboard: [http://localhost:3000/admin/orders](http://localhost:3000/admin/orders)
+   | Surface | URL |
+   |---------|-----|
+   | Shop home | http://localhost:3000 |
+   | Brands hub | http://localhost:3000/brands |
+   | Brand page | http://localhost:3000/brands/mideer (also `/tonies`, `/micro-scooters`) |
+   | Checkout | http://localhost:3000/checkout |
+   | Admin | http://localhost:3000/admin |
+   | Orders | http://localhost:3000/admin/orders |
+
+## Storefront
+
+- **Home** (`/`) — curated entry; brand navigation via `ShopHeader`
+- **Brands** (`/brands`, `/brands/[slug]`) — registry-driven pages for Mideer, Tonies, Micro Scooters (Connetix / Le Toy Van reserved, inactive)
+- **Catalog API** — `GET /api/catalog` (public) loads active products for the shop
+- **Pre-order** — products with `presell_enabled` can sell against expected arrival (see migration 0010)
+- **Checkout** — Stripe Checkout session; success/cancel pages under `/checkout/success` and `/checkout/cancel`
+- **Currency** — brand-aware display (e.g. Mideer CNY, Tonies/Micro GBP)
+
+Brand config lives in `lib/brands/registry.ts`. Logos are in `public/brands/`.
+
+## Stripe checkout
+
+1. Create a Stripe Checkout flow using `STRIPE_SECRET_KEY`.
+2. Add a webhook endpoint: `POST /api/stripe/webhook` for `checkout.session.completed`.
+3. Set `STRIPE_WEBHOOK_SECRET` from the Stripe Dashboard.
+4. In production, set `NEXT_PUBLIC_SITE_URL` so success/cancel redirects resolve correctly.
+
+Local webhook testing:
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
 
 ## Fulfilment workflow
 
 ```
-Customer places order
+Customer pays (Stripe) → order created
         ↓
 Order appears in /admin/orders
         ↓
@@ -93,74 +131,50 @@ Open Shopify → purchase shipping label
 Dispatch parcel
 ```
 
-No manual retyping of customer details is required.
+## Inventory & warehouse
 
-## Inventory & warehouse (Sprint 006)
-
-The inventory module is the single source of truth for all physical stock.
-
-- **Dashboard:** [http://localhost:3000/admin/inventory](http://localhost:3000/admin/inventory)
+- **Dashboard:** `/admin/inventory`
 - **Products:** `/admin/inventory/products` — search, export CSV, stock ledger
-- **Warehouses:** `/admin/inventory/warehouse` — London Garage, Main Warehouse
-- **Receive goods:** `/admin/inventory/receive` — inbound stock with PO reference
-- **Stock take:** `/admin/inventory/stock-take` — cycle counts with variance approval
-
-Run migration `0006_inventory_warehouse.sql` before using inventory features.
+- **Pricing:** `/admin/inventory/pricing`
+- **Warehouses:** `/admin/inventory/warehouse`
+- **Receive goods:** `/admin/inventory/receive`
+- **Stock take:** `/admin/inventory/stock-take`
+- **Warehouse ops:** `/admin/warehouse` — pick / pack / dispatch
 
 Architecture docs: `../docs/vision/ARCHITECTURE.md` and `../docs/database/Schema.md`.
 
 ## Shopify setup
 
-1. In **Shopify Admin → Settings → Apps and sales channels → Develop apps**, create a custom app.
-2. Configure **Admin API scopes**:
-   - `read_draft_orders`
-   - `write_draft_orders`
-3. Install the app and copy the **Admin API access token**.
-4. Add to `.env.local`:
-   ```
-   SHOPIFY_STORE=your-store-name
-   SHOPIFY_ADMIN_TOKEN=shpat_...
-   SHOPIFY_API_VERSION=2025-01
-   ```
+Preferred (Shopify Dev Dashboard apps, 2026+):
+
+```
+SHOPIFY_STORE=your-store-name
+SHOPIFY_CLIENT_ID=...
+SHOPIFY_CLIENT_SECRET=...
+SHOPIFY_API_VERSION=2025-01
+```
+
+Legacy custom apps can still use `SHOPIFY_ADMIN_TOKEN=shpat_...`.
+
+Required Admin API scopes: `read_draft_orders`, `write_draft_orders`.
 
 ### How Shopify sync works
 
-- Each portal order is tagged in Shopify as `portal:CBC9001` (using the portal order number).
+- Each portal order is tagged in Shopify as `portal:CBC9001` (portal order number).
 - Before creating a draft order, the system searches Shopify for this tag to prevent duplicates.
-- The draft order includes customer name, shipping address, phone, line items (SKU, quantity, weight), currency, notes, WeChat ID, and parcel weight.
 - After a successful push, `shopify_draft_order_id` and `fulfilment_status = ready` are saved in Supabase.
 
 ## Product weights
 
-Shipping labels require parcel weight. Each product should have `weight_grams` set in Supabase:
-
-```sql
-UPDATE products SET weight_grams = 240 WHERE sku = 'ABC001';
-```
-
-Order weight is computed as `SUM(weight_grams × quantity)` and stored as `orders.total_weight_grams`. Displayed as e.g. `1.84 kg` in the fulfilment dashboard.
-
-## Database migrations
-
-| File | Change |
-| --- | --- |
-| `0001_orders_notes.sql` | `orders.notes` |
-| `0002_orders_checkout_fields.sql` | `email`, `address`, `payment_method`, `currency` |
-| `0003_orders_order_number.sql` | `order_number` (unique, e.g. CBC9001) |
-| `0004_fulfilment_fields.sql` | `products.weight_grams`, `orders.total_weight_grams`, `orders.shopify_draft_order_id`, `orders.fulfilment_status` |
-| `0005_order_customer_fields.sql` | `first_name`, `last_name`, `postcode` |
-| `0006_inventory_warehouse.sql` | Inventory ledger, warehouses, receiving, stock take |
-| `0007_warehouse_operations.sql` | Pick/pack/dispatch, warehouse status |
-| `0008_purchasing.sql` | Suppliers, POs, inbound shipments |
-| `0009_platform_foundation.sql` | Organizations, staff profiles, `organization_id` |
+Shipping labels need parcel weight. Set `weight_grams` on products; order weight is `SUM(weight_grams × quantity)` → `orders.total_weight_grams`.
 
 ## Admin access
 
 Staff sign in at `/admin/login` using Supabase Auth (email + password). Create users in **Supabase → Authentication → Users**.
 
-All `/api/*` routes require authentication except `POST /api/orders` (customer checkout).
+Public API routes (no staff auth): `GET /api/catalog`, `POST /api/orders`, Stripe webhook/session. All other `/api/*` routes require authentication.
 
-Tenant configuration lives in `tenants/chosen-by-chloe/`. Platform code lives in `lib/thomas/`.
+Tenant configuration: `tenants/chosen-by-chloe/`. Platform code: `lib/thomas/`.
 
 ## Scripts
 
@@ -170,12 +184,15 @@ Tenant configuration lives in `tenants/chosen-by-chloe/`. Platform code lives in
 | `npm run build` | Production build |
 | `npm run start` | Run the production build |
 | `npm run lint` | Lint |
-| `npm run import:products` | Import products from `../CI+PL.xlsx` |
+| `npm run import:products` | Import products from spreadsheet |
 | `npm run upload:images` | Upload product images to Supabase Storage |
+| `npm run import:tonies-images` | Match & upload Tonies images from tonies.com |
+
+Other one-off import/audit scripts live under `scripts/` (Tonies Blink24, Micro dropship, Mideer PI, pricing audit). Run with `npx tsx scripts/<name>.ts`.
 
 ### Adding product images
 
-Name each image file after the product SKU (e.g. `MID-001.jpg`), place them in `web/product-images/`, then run:
+Name each image after the product SKU (e.g. `MID-001.jpg`), place them in `web/product-images/`, then:
 
 ```bash
 npm run upload:images
@@ -186,61 +203,51 @@ npm run upload:images
 ```
 web/
   app/
-    page.tsx                          # Homepage: product grid
-    checkout/page.tsx                 # Checkout form + order summary
-    admin/orders/page.tsx             # Fulfilment dashboard
-    admin/orders/[id]/page.tsx        # Order detail + fulfilment actions
-    api/orders/route.ts               # POST: create order
-    api/orders/list/route.ts          # GET: list orders (admin)
-    api/orders/[id]/route.ts          # GET: order detail
-    api/orders/[id]/packing-slip/     # GET: download PDF
-    api/orders/[id]/shopify/          # POST: push to Shopify
+    page.tsx                     # Shop home
+    brands/                      # Brand hub + /brands/[slug]
+    checkout/                    # Checkout + Stripe success/cancel
+    admin/                       # Orders, inventory, warehouse, purchasing
+    api/
+      catalog/                   # Public product catalog
+      orders/                    # Create / list / fulfil orders
+      stripe/                    # Checkout session + webhook
   components/
-    pdf/PackingSlip.tsx               # @react-pdf packing slip template
-  hooks/
-    useShopify.ts                     # Shopify push + PDF download hooks
+    brands/                      # BrandHero, BrandCatalog, BrandNav, …
+    shop/                        # ShopHeader
+    pdf/                         # Packing slip
   lib/
-    pdf/packingSlip.ts                # Server-side PDF generation
-    shopify/                          # GraphQL client, search, create draft order
-    orders.ts                         # Order queries + packing slip data builder
-    weight.ts                         # Weight calculation + formatting
-  types/
-    order.ts                          # Order + fulfilment types
-    shopify.ts                        # Shopify API types
-  supabase/migrations/                # Incremental schema changes
+    brands/                      # Brand registry + catalog matching
+    pricing.ts                   # Cost → sell price helpers
+    stripe/                      # Checkout + payment completion
+    shopify/                     # Auth, GraphQL, draft orders
+    thomas/                      # Platform auth, tenant resolve
+  public/brands/                 # Brand logos
+  scripts/                       # Import, image, pricing utilities
+  supabase/migrations/           # 0001–0012
 ```
 
 ## Manual testing checklist
 
-### Packing slip
+### Stripe checkout
 
-- [ ] Place a test order through the shop checkout
-- [ ] Open `/admin/orders` and confirm the order appears
-- [ ] Open the order detail page
-- [ ] Click **Download Packing Slip** — PDF downloads immediately
-- [ ] Open PDF: verify logo, order number, customer name, address, phone, WeChat ID, payment method, currency, item table, quantities, subtotal, grand total, footer
-- [ ] Print PDF on A4 — layout fits correctly
+- [ ] Place a test order with Stripe test mode
+- [ ] Confirm redirect to `/checkout/success`
+- [ ] Confirm order appears in `/admin/orders` with payment recorded
+- [ ] Cancel mid-checkout → `/checkout/cancel`
 
-### Product weights
+### Brands
 
-- [ ] Set `weight_grams` on test products in Supabase
-- [ ] Place an order with multiple items
-- [ ] Confirm parcel weight displays correctly on order detail (e.g. `1.84 kg`)
-- [ ] Confirm weight appears on packing slip PDF
+- [ ] `/brands` lists active brands with logos
+- [ ] `/brands/tonies` shows categories + search
+- [ ] `/brands/micro-scooters` and `/brands/mideer` load catalogs
 
-### Shopify sync
+### Packing slip & Shopify
 
-- [ ] Configure `SHOPIFY_STORE`, `SHOPIFY_ADMIN_TOKEN` in `.env.local`
-- [ ] Click **Push to Shopify** on an order
-- [ ] Confirm draft order created in Shopify Admin → Orders → Drafts
-- [ ] Verify customer name, address, phone, line items, SKU, quantity, weight, currency, notes, WeChat ID
-- [ ] Click **Push to Shopify** again — confirm "Already Synced" (no duplicate)
-- [ ] Click **Open Shopify** — opens the draft order in Shopify Admin
-- [ ] Confirm `shopify_draft_order_id` saved in Supabase and status shows **Ready**
+- [ ] Download packing slip PDF from order detail
+- [ ] Push to Shopify → draft order created; second push does not duplicate
+- [ ] Parcel weight displays when `weight_grams` is set
 
 ### Fulfilment dashboard
 
-- [ ] `/admin/orders` shows columns: Order, Packing Slip, Shopify, Weight, Status
+- [ ] `/admin/orders` shows order, packing slip, Shopify, weight, status
 - [ ] Status shows **Ready** after Shopify sync
-- [ ] Buttons show loading states while processing
-- [ ] Error messages display on failure (e.g. missing Shopify credentials)
