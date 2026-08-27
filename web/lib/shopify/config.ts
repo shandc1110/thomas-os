@@ -1,30 +1,37 @@
 import "server-only";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
+import { getShopifyShopHostname, normalizeShopifyStore } from "./auth";
 
 export type ShopifyConfig = {
   store: string;
-  adminToken: string;
   apiVersion: string;
 };
 
 export function getShopifyConfig(): ShopifyConfig {
-  const store = process.env.SHOPIFY_STORE?.trim();
-  const adminToken = process.env.SHOPIFY_ADMIN_TOKEN?.trim();
+  const store = normalizeShopifyStore(process.env.SHOPIFY_STORE ?? "");
   const apiVersion = process.env.SHOPIFY_API_VERSION?.trim() || "2025-01";
 
   if (!store) {
     throw new Error("SHOPIFY_STORE is not configured.");
   }
-  if (!adminToken) {
-    throw new Error("SHOPIFY_ADMIN_TOKEN is not configured.");
+
+  const hasClientCreds = Boolean(
+    process.env.SHOPIFY_CLIENT_ID?.trim() && process.env.SHOPIFY_CLIENT_SECRET?.trim(),
+  );
+  const hasLegacyToken = Boolean(process.env.SHOPIFY_ADMIN_TOKEN?.trim());
+  if (!hasClientCreds && !hasLegacyToken) {
+    throw new Error(
+      "Shopify auth is not configured. Set SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET " +
+        "(Dev Dashboard), or SHOPIFY_ADMIN_TOKEN.",
+    );
   }
 
-  return { store, adminToken, apiVersion };
+  return { store, apiVersion };
 }
 
 export function getShopifyGraphQLUrl(config?: ShopifyConfig): string {
-  const { store, apiVersion } = config ?? getShopifyConfig();
-  const hostname = store.includes(".myshopify.com") ? store : `${store}.myshopify.com`;
+  const { apiVersion } = config ?? getShopifyConfig();
+  const hostname = getShopifyShopHostname(config?.store);
   return `https://${hostname}/admin/api/${apiVersion}/graphql.json`;
 }
 
@@ -34,7 +41,7 @@ export function getShopifyDraftOrderAdminUrl(draftOrderGid: string): string | nu
     const { store } = getShopifyConfig();
     const numericId = draftOrderGid.split("/").pop();
     if (!numericId) return null;
-    const hostname = store.includes(".myshopify.com") ? store : `${store}.myshopify.com`;
+    const hostname = getShopifyShopHostname(store);
     return `https://${hostname}/admin/draft_orders/${numericId}`;
   } catch {
     return null;

@@ -2,6 +2,8 @@ import type { WarehouseOrderStatus } from "@/types/warehouse-ops";
 
 export type FulfilmentStatus = "pending" | "ready" | "fulfilled" | "awaiting_stock" | "cancelled";
 
+export type PaymentStatus = "unpaid" | "pending" | "paid" | "refunded";
+
 export type OrderRecord = {
   id: string | number;
   order_number: string | null;
@@ -14,6 +16,8 @@ export type OrderRecord = {
   address: string | null;
   postcode: string | null;
   payment_method: string | null;
+  payment_status: PaymentStatus;
+  paid_at: string | null;
   currency: string | null;
   notes: string | null;
   total_weight_grams: number | null;

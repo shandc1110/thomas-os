@@ -121,7 +121,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <div className="flex items-end justify-between">
           <span className="text-lg font-semibold text-ink">
-            {formatPrice(product.price)}
+            {formatPrice(product.price, product.currency)}
           </span>
           {!soldOut && (
             <span className="text-xs text-muted">

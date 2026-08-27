@@ -10,7 +10,7 @@ const SEARCH_DRAFT_ORDERS = `
           id
           name
           tags
-          note
+          note2
         }
       }
     }

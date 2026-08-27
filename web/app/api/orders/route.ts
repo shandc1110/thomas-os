@@ -10,8 +10,11 @@ import {
 import { getDefaultWarehouseLocation } from "@/lib/warehouse/warehouses";
 import { computeTotalWeightGrams } from "@/lib/weight";
 import { getSellableStock, getOnHandStock } from "@/lib/presell";
-import { priceForCurrency } from "@/lib/currency";
+import { unitPriceForOrder } from "@/lib/currency";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
+import { isStripeConfigured } from "@/lib/stripe/client";
+import { amountGbpForStripe, createStripeCheckoutSession } from "@/lib/stripe/checkout";
+import { isStripePaymentMethod } from "@/lib/stripe/constants";
 import type {
   CreateOrderError,
   CreateOrderRequest,
@@ -27,6 +30,7 @@ type ProductRow = {
   id: string | number;
   name: string;
   price: number | null;
+  currency: string | null;
   stock: number | null;
   presell_enabled: boolean | null;
   presell_quantity: number | null;
@@ -184,7 +188,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   const ids = items.map((item) => item.product_id);
   const { data: productRows, error: fetchError } = await supabase
     .from("products")
-    .select("id, name, price, stock, presell_enabled, presell_quantity, expected_arrival_month, active, weight_grams")
+    .select("id, name, price, currency, stock, presell_enabled, presell_quantity, expected_arrival_month, active, weight_grams")
     .in("id", ids);
 
   if (fetchError) {
@@ -282,11 +286,13 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     );
   }
 
-  const totalCny = items.reduce((sum, item) => {
+  const total = items.reduce((sum, item) => {
     const product = productMap.get(String(item.product_id));
-    return sum + (product?.price ?? 0) * item.quantity;
+    return (
+      sum +
+      unitPriceForOrder(product?.price ?? 0, product?.currency, currency) * item.quantity
+    );
   }, 0);
-  const total = priceForCurrency(totalCny, currency);
 
   const totalWeightGrams = computeTotalWeightGrams(
     items.map((item) => {
@@ -354,12 +360,11 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
 
   const orderItemsPayload = items.map((item) => {
     const product = productMap.get(String(item.product_id))!;
-    const cnyPrice = product.price ?? 0;
     return {
       order_id: orderId,
       product_id: item.product_id,
       quantity: item.quantity,
-      price: priceForCurrency(cnyPrice, currency),
+      price: unitPriceForOrder(product.price ?? 0, product.currency, currency),
       presell_quantity: allocationMap.get(String(item.product_id)) ?? 0,
     };
   });
@@ -385,6 +390,84 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     );
   }
 
+  const payByStripe = isStripePaymentMethod(paymentMethod);
+
+  if (payByStripe) {
+    if (!isStripeConfigured()) {
+      await supabase.from("orders").delete().eq("id", orderId);
+      await restoreCustomerOrderMovements(
+        supabase,
+        applied.map((a) => ({
+          product_id: a.productId,
+          quantity: a.quantity,
+          presell_quantity: allocationMap.get(String(a.productId)) ?? 0,
+        })),
+        orderNumber,
+        warehouseLoc.warehouseId,
+        warehouseLoc.locationId,
+      );
+      return NextResponse.json<CreateOrderError>(
+        { success: false, error: "Card payments are not available right now. Please choose another method." },
+        { status: 503 },
+      );
+    }
+
+    try {
+      const stripeLines = items.map((item) => {
+        const product = productMap.get(String(item.product_id))!;
+        const unitPrice = unitPriceForOrder(product.price ?? 0, product.currency, currency);
+        return {
+          name: product.name,
+          quantity: item.quantity,
+          unitAmountGbp: amountGbpForStripe(unitPrice, currency),
+        };
+      });
+
+      const { sessionId, url } = await createStripeCheckoutSession({
+        orderId,
+        orderNumber,
+        customerEmail: email,
+        portalCurrency: currency,
+        lines: stripeLines,
+      });
+
+      await supabase
+        .from("orders")
+        .update({
+          payment_status: "pending",
+          stripe_checkout_session_id: sessionId,
+        })
+        .eq("id", orderId);
+
+      return NextResponse.json({
+        success: true,
+        order_id: orderId,
+        order_number: orderNumber,
+        total,
+        email_sent: false,
+        checkout_url: url,
+      });
+    } catch (stripeError) {
+      console.error("Stripe checkout session failed:", stripeError);
+      await supabase.from("orders").delete().eq("id", orderId);
+      await restoreCustomerOrderMovements(
+        supabase,
+        applied.map((a) => ({
+          product_id: a.productId,
+          quantity: a.quantity,
+          presell_quantity: allocationMap.get(String(a.productId)) ?? 0,
+        })),
+        orderNumber,
+        warehouseLoc.warehouseId,
+        warehouseLoc.locationId,
+      );
+      return NextResponse.json<CreateOrderError>(
+        { success: false, error: "Could not start card payment. Please try again or choose another method." },
+        { status: 502 },
+      );
+    }
+  }
+
   const emailSent = await sendOrderConfirmationEmail({
     orderNumber,
     customer: {
@@ -401,11 +484,10 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     },
     items: items.map((item) => {
       const product = productMap.get(String(item.product_id))!;
-      const cnyPrice = product.price ?? 0;
       return {
         name: product.name,
         quantity: item.quantity,
-        price: priceForCurrency(cnyPrice, currency),
+        price: unitPriceForOrder(product.price ?? 0, product.currency, currency),
       };
     }),
     total,

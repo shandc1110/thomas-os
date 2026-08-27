@@ -1,9 +1,8 @@
-export function formatPrice(value: number | null | undefined): string {
-  const amount = typeof value === "number" && !Number.isNaN(value) ? value : 0;
-  return new Intl.NumberFormat("zh-CN", {
-    style: "currency",
-    currency: "CNY",
-  }).format(amount);
+export function formatPrice(
+  value: number | null | undefined,
+  currency: string | null | undefined = "CNY",
+): string {
+  return formatOrderPrice(value, currency);
 }
 
 export function formatOrderPrice(
@@ -17,6 +16,19 @@ export function formatOrderPrice(
     style: "currency",
     currency: code,
   }).format(value);
+}
+
+export function formatPaymentStatus(status: string | null | undefined): string {
+  switch (status) {
+    case "paid":
+      return "Paid";
+    case "pending":
+      return "Awaiting payment";
+    case "refunded":
+      return "Refunded";
+    default:
+      return "Unpaid";
+  }
 }
 
 export function formatFulfilmentStatus(status: string | null | undefined): string {

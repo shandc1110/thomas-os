@@ -2,7 +2,7 @@
  * Apply data from Chosen by Chloe New Arrival spreadsheet.
  *
  * Console price (price / retail_price):
- *   order_price × 1.25 + weight_kg × 14 × 1.25
+ *   order_price × 1.25 + weight_kg × 14 × 1.25, rounded up to nearest 9
  *
  * By default does NOT overwrite console prices you already set.
  * Never touches shopify_price (set manually in Admin → Pricing).
@@ -16,14 +16,13 @@
  */
 import * as XLSX from "xlsx";
 import { createClient } from "@supabase/supabase-js";
+import { calcConsolePrice, round2 } from "@/lib/pricing";
 import { loadEnv } from "./load-env";
 
 loadEnv();
 
 const FILE =
   "C:/Users/Dongchen/Desktop/20260715Chosen by Chole&New Arrival Products List-260701-new exchange rate.xlsx";
-const MARKUP = 1.25;
-const SHIPPING_PER_KG = 14;
 const dryRun = process.argv.includes("--dry");
 const forceConsole = process.argv.includes("--force-console-prices");
 
@@ -37,15 +36,6 @@ type Row = {
   heightMm: number | null;
   consolePrice: number;
 };
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-/** Console formula: cost × 1.25 + weight(kg) × 14 × 1.25 */
-function calcConsolePrice(orderPrice: number, weightKg: number): number {
-  return round2(orderPrice * MARKUP + weightKg * SHIPPING_PER_KG * MARKUP);
-}
 
 function parseRows(): Row[] {
   const wb = XLSX.readFile(FILE);

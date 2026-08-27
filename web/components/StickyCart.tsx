@@ -1,12 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { useCart } from "@/context/CartContext";
-import { formatPrice } from "@/lib/format";
+import { normaliseCurrency, unitPriceForOrder } from "@/lib/currency";
+import { formatOrderPrice } from "@/lib/format";
 
 export default function StickyCart() {
-  const { totalItems, totalPrice, hydrated } = useCart();
+  const { items, totalItems, hydrated } = useCart();
   const hasItems = hydrated && totalItems > 0;
+
+  const { displayTotal, displayCurrency } = useMemo(() => {
+    const currencies = new Set(
+      items.map((item) => normaliseCurrency(item.product.currency)),
+    );
+    const displayCurrency =
+      currencies.size === 1 ? [...currencies][0]! : currencies.has("GBP") ? "GBP" : "CNY";
+    let total = 0;
+    for (const item of items) {
+      total +=
+        unitPriceForOrder(item.product.price ?? 0, item.product.currency, displayCurrency) *
+        item.quantity;
+    }
+    return { displayTotal: total, displayCurrency };
+  }, [items]);
 
   return (
     <div
@@ -26,7 +43,9 @@ export default function StickyCart() {
             </span>
             {totalItems === 1 ? "item" : "items"} &middot; Checkout
           </span>
-          <span className="text-base font-semibold">{formatPrice(totalPrice)}</span>
+          <span className="text-base font-semibold">
+            {formatOrderPrice(displayTotal, displayCurrency)}
+          </span>
         </Link>
       </div>
     </div>

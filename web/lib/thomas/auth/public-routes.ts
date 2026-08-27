@@ -2,6 +2,8 @@
 const PUBLIC_API_ROUTES: { method: string; path: string }[] = [
   { method: "GET", path: "/api/catalog" },
   { method: "POST", path: "/api/orders" },
+  { method: "POST", path: "/api/stripe/webhook" },
+  { method: "GET", path: "/api/stripe/session" },
 ];
 
 export function isPublicApiRoute(method: string, pathname: string): boolean {

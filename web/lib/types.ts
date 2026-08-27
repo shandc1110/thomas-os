@@ -10,6 +10,8 @@ export type Product = {
   retail_price: number | null;
   shopify_price: number | null;
   cost_price: number | null;
+  /** Native currency of catalog prices (CNY for MiDeer, GBP for Tonies RRP). */
+  currency: string | null;
   image_url: string | null;
   gallery_images: string[];
   stock: number | null;

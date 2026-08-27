@@ -36,6 +36,8 @@ export type CreateOrderSuccess = {
   order_number: string;
   total: number;
   email_sent: boolean;
+  /** Stripe Checkout redirect URL when paying by card. */
+  checkout_url?: string;
 };
 
 export type CreateOrderError = {

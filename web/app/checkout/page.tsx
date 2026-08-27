@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/context/CartContext";
-import { getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate, priceForCurrency } from "@/lib/currency";
+import { getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate, unitPriceForOrder } from "@/lib/currency";
 import { formatOrderPrice } from "@/lib/format";
+import { STRIPE_PAYMENT_METHOD } from "@/lib/stripe/constants";
 import { getSellableStock, formatExpectedArrival, isPresellOnly } from "@/lib/presell";
 import type { CreateOrderResponse, StockIssue } from "@/lib/order";
 
@@ -34,7 +35,7 @@ const initialForm: FormState = {
   notes: "",
 };
 
-const PAYMENT_METHODS = ["Bank transfer", "WeChat Pay", "Alipay"];
+const PAYMENT_METHODS = ["Bank transfer", "WeChat Pay", "Alipay", STRIPE_PAYMENT_METHOD];
 
 const CURRENCIES = [
   { value: "CNY", label: "RMB (¥)" },
@@ -42,8 +43,9 @@ const CURRENCIES = [
 ];
 
 export default function CheckoutPage() {
-  const { items, totalItems, totalPrice, hydrated, setQuantity, removeItem, clear } = useCart();
+  const { items, totalItems, hydrated, setQuantity, removeItem, clear } = useCart();
   const [form, setForm] = useState<FormState>(initialForm);
+  const [currencyTouched, setCurrencyTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<StockIssue[]>([]);
@@ -52,17 +54,37 @@ export default function CheckoutPage() {
   const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null);
   const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
 
-  const displayTotal = useMemo(
-    () => priceForCurrency(totalPrice, form.currency),
-    [totalPrice, form.currency],
-  );
+  useEffect(() => {
+    if (!hydrated || currencyTouched || items.length === 0) return;
+    const hasGbp = items.some((item) => (item.product.currency ?? "CNY").toUpperCase() === "GBP");
+    const hasCny = items.some((item) => (item.product.currency ?? "CNY").toUpperCase() !== "GBP");
+    if (hasGbp && !hasCny) {
+      setForm((prev) => (prev.currency === "GBP" ? prev : { ...prev, currency: "GBP" }));
+    }
+  }, [hydrated, items, currencyTouched]);
+
+  const displayTotal = useMemo(() => {
+    return items.reduce(
+      (sum, item) =>
+        sum +
+        unitPriceForOrder(item.product.price ?? 0, item.product.currency, form.currency) *
+          item.quantity,
+      0,
+    );
+  }, [items, form.currency]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function itemDisplayPrice(cnyPrice: number | null | undefined): string {
-    return formatOrderPrice(priceForCurrency(cnyPrice ?? 0, form.currency), form.currency);
+  function itemDisplayPrice(
+    catalogPrice: number | null | undefined,
+    productCurrency: string | null | undefined,
+  ): string {
+    return formatOrderPrice(
+      unitPriceForOrder(catalogPrice ?? 0, productCurrency, form.currency),
+      form.currency,
+    );
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -100,6 +122,12 @@ export default function CheckoutPage() {
       if (!response.ok || !result.success) {
         setError(result.success ? "Something went wrong." : result.error);
         if (!result.success && result.issues) setIssues(result.issues);
+        return;
+      }
+
+      if (result.checkout_url) {
+        clear();
+        window.location.href = result.checkout_url;
         return;
       }
 
@@ -196,7 +224,9 @@ export default function CheckoutPage() {
                 <p className="truncate font-serif text-base text-espresso">
                   {item.product.name}
                 </p>
-                <p className="text-sm text-muted">{itemDisplayPrice(item.product.price)}</p>
+                <p className="text-sm text-muted">
+                  {itemDisplayPrice(item.product.price, item.product.currency)}
+                </p>
                 {isPresellOnly(item.product) && arrival && (
                   <p className="text-xs text-clay">Pre-order · arrives {arrival}</p>
                 )}
@@ -324,10 +354,20 @@ export default function CheckoutPage() {
           required
         />
 
+        {form.payment_method === STRIPE_PAYMENT_METHOD && (
+          <p className="text-xs text-muted">
+            You&apos;ll be redirected to Stripe to pay securely by card. Card payments are charged
+            in GBP (UK cards: 1.5% + 20p per transaction).
+          </p>
+        )}
+
         <Select
           label="Currency"
           value={form.currency}
-          onChange={(v) => update("currency", v)}
+          onChange={(v) => {
+            setCurrencyTouched(true);
+            update("currency", v);
+          }}
           options={CURRENCIES}
           required
         />
@@ -373,8 +413,12 @@ export default function CheckoutPage() {
           className="w-full rounded-full bg-cocoa px-6 py-4 text-sm font-semibold uppercase tracking-wide text-cream shadow-lg shadow-espresso/20 transition-colors hover:bg-espresso disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting
-            ? "Placing order..."
-            : `Place order · ${formatOrderPrice(displayTotal, form.currency)}`}
+            ? form.payment_method === STRIPE_PAYMENT_METHOD
+              ? "Redirecting to payment…"
+              : "Placing order..."
+            : form.payment_method === STRIPE_PAYMENT_METHOD
+              ? `Pay by card · ${formatOrderPrice(displayTotal, form.currency)}`
+              : `Place order · ${formatOrderPrice(displayTotal, form.currency)}`}
         </button>
       </form>
     </main>

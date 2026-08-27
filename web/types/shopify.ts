@@ -12,7 +12,8 @@ export type ShopifyDraftOrderNode = {
   id: string;
   name: string;
   tags: string[];
-  note: string | null;
+  /** Shopify renamed DraftOrder.note → note2 in recent Admin API versions. */
+  note2: string | null;
 };
 
 export type ShopifyDraftOrderCreateResult = {

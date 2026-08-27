@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { convertCnyToGbp, getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate } from "@/lib/currency";
 import { formatExpectedArrival } from "@/lib/presell";
 import { formatOrderPrice } from "@/lib/format";
+import { calcConsolePriceFromGrams } from "@/lib/pricing";
 import type { ProductMaster } from "@/types/inventory";
 
 type Filter = "in-transit" | "needs-price" | "all";
@@ -30,10 +31,9 @@ function parseAmount(value: string): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-/** Console formula: supplier cost × 1.25 + weight_kg × 14 × 1.25 */
+/** Console formula: cost × 1.25 + weight × 14 × 1.25, rounded up to nearest 9 */
 function suggestedConsolePrice(costCny: number, weightGrams: number | null | undefined): number {
-  const weightKg = Math.max((weightGrams ?? 0) / 1000, 0);
-  return Math.round((costCny * 1.25 + weightKg * 14 * 1.25) * 100) / 100;
+  return calcConsolePriceFromGrams(costCny, weightGrams);
 }
 
 function needsPrice(product: ProductMaster): boolean {
@@ -178,7 +178,7 @@ export default function PricingPage() {
         <p className="mt-1 max-w-2xl text-sm text-muted">
           Console price (this portal):{" "}
           <span className="font-medium text-espresso">
-            supplier cost × 1.25 + weight(kg) × 14 × 1.25
+            supplier cost × 1.25 + weight(kg) × 14 × 1.25, rounded up to nearest 9
           </span>
           . Checkout GBP uses ¥{rate} × {markup}. Shopify price is set manually — never overwritten by
           the formula.

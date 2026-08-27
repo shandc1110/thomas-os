@@ -1,105 +1,80 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import type { Product } from "@/lib/types";
-import { getClientTenant } from "@/lib/thomas";
-import { getSellableStock } from "@/lib/presell";
-import Catalog from "@/components/Catalog";
+import { BrandCard } from "@/components/brands/BrandCard";
+import { ShopHeader } from "@/components/shop/ShopHeader";
 import { RecoveryRedirect } from "@/components/thomas/RecoveryRedirect";
+import { brandSlugFromProductBrand, getActiveBrands } from "@/lib/brands";
+import { fetchCatalogProducts } from "@/lib/brands/catalog";
+import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
 
-export default function Home() {
-  const tenant = getClientTenant();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const tenant = getActiveTenant();
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const response = await fetch("/api/catalog");
-        const result = (await response.json()) as {
-          success: boolean;
-          products?: Product[];
-          error?: string;
-        };
+export const metadata: Metadata = {
+  title: tenant.storefront.title,
+  description: tenant.storefront.description,
+  alternates: {
+    canonical: process.env.NEXT_PUBLIC_SITE_URL
+      ? `${process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")}/`
+      : undefined,
+  },
+};
 
-        if (!response.ok || !result.success) {
-          setError(result.error ?? "Could not load products.");
-        } else {
-          // Keep sold-out items visible (clearly marked) but sort them last.
-          const rows = (result.products ?? []).slice().sort((a, b) => {
-            const aOut = getSellableStock(a) <= 0 ? 1 : 0;
-            const bOut = getSellableStock(b) <= 0 ? 1 : 0;
-            return aOut - bOut;
-          });
-          setProducts(rows);
-        }
-      } catch {
-        setError("Could not load products.");
-      }
-      setLoading(false);
-    }
+export const dynamic = "force-dynamic";
 
-    load();
-  }, []);
+export default async function Home() {
+  const brands = getActiveBrands();
+  let counts = new Map<string, number>();
+
+  try {
+    const products = await fetchCatalogProducts();
+    counts = products.reduce((map, product) => {
+      const slug = brandSlugFromProductBrand(product.brand);
+      if (!slug) return map;
+      map.set(slug, (map.get(slug) ?? 0) + 1);
+      return map;
+    }, new Map<string, number>());
+  } catch {
+    // Hub still renders; counts optional
+  }
 
   return (
-    <main className="relative mx-auto min-h-full w-full max-w-3xl px-4">
+    <main className="relative mx-auto min-h-full w-full max-w-3xl px-4 pb-16">
       <RecoveryRedirect />
-      <Link
-        href="/admin/login"
-        className="absolute right-4 top-4 z-10 inline-flex min-h-9 items-center rounded-full bg-linen px-4 text-xs font-semibold text-espresso ring-1 ring-sand transition hover:bg-sand/50"
-      >
-        Admin Login
-      </Link>
-      <header className="pt-8 pb-8 text-center">
-        <div className="mx-auto mb-5 flex items-center justify-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={tenant.brand.logoUrl}
-            alt={tenant.brand.name}
-            className="h-14 w-14 rounded-full object-cover ring-1 ring-sand"
-          />
-        </div>
-        <h1 className="font-serif text-4xl text-espresso sm:text-5xl">
-          {tenant.brand.name}
-        </h1>
-        <p className="mx-auto mt-3 text-sm font-medium tracking-wide text-clay">
-          {tenant.brand.tagline}
-        </p>
-        <p className="mx-auto mt-4 max-w-md text-sm text-muted">
-          Handpicked pieces, ready to order. Add your favourites to the basket and
-          check out.
-        </p>
-      </header>
+      <ShopHeader
+        subtitle="Handpicked brands, ready to order. Choose a collection below."
+      />
 
-      {error ? (
-        <div className="rounded-3xl bg-white p-6 text-center ring-1 ring-sand/60">
-          <p className="font-serif text-lg text-espresso">
-            We couldn&apos;t load the collection
-          </p>
-          <p className="mt-2 text-sm text-muted">{error}</p>
-        </div>
-      ) : loading ? (
-        <div className="grid grid-cols-2 gap-4 pb-12 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div
-              key={index}
-              className="aspect-[3/4] animate-pulse rounded-3xl bg-white/70 ring-1 ring-sand/50"
-            />
-          ))}
-        </div>
-      ) : products.length === 0 ? (
+      <h1 className="sr-only">{tenant.brand.name} brands</h1>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        {brands.map((brand) => (
+          <BrandCard
+            key={brand.slug}
+            brand={brand}
+            productCount={counts.get(brand.slug)}
+          />
+        ))}
+      </div>
+
+      {brands.length === 0 && (
         <div className="rounded-3xl bg-white p-10 text-center ring-1 ring-sand/60">
-          <p className="font-serif text-xl text-espresso">Nothing here just yet</p>
+          <p className="font-serif text-xl text-espresso">No brands listed yet</p>
           <p className="mx-auto mt-2 max-w-xs text-sm text-muted">
-            There are no active products available right now. Please check back soon.
+            Brand collections will appear here soon.
           </p>
         </div>
-      ) : (
-        <Catalog products={products} />
       )}
+
+      <p className="mt-10 text-center text-xs text-muted">
+        Prefer the full catalogue without a brand filter?{" "}
+        <Link href="/brands/mideer" className="text-cocoa underline-offset-2 hover:underline">
+          Start with Mideer
+        </Link>
+        {" · "}
+        <Link href="/brands/tonies" className="text-cocoa underline-offset-2 hover:underline">
+          or Tonies
+        </Link>
+      </p>
     </main>
   );
 }

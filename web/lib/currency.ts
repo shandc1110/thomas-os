@@ -34,7 +34,30 @@ export function convertCnyToGbp(cnyAmount: number): number {
   return Math.round((cnyAmount / rate) * markup * 100) / 100;
 }
 
-/** Return the order price for the chosen currency (catalog prices are stored in CNY). */
+/** Reverse of convertCnyToGbp (approx). */
+export function convertGbpToCny(gbpAmount: number): number {
+  const rate = getCnyToGbpRate();
+  const markup = getCnyToGbpMarkup();
+  return Math.round(((gbpAmount / markup) * rate) * 100) / 100;
+}
+
+/**
+ * Catalog prices may be CNY (MiDeer) or GBP (Tonies RRP).
+ * Convert a unit catalog price into the order/checkout currency.
+ */
+export function unitPriceForOrder(
+  catalogPrice: number,
+  productCurrency: string | null | undefined,
+  orderCurrency: string | null | undefined,
+): number {
+  const from = normaliseCurrency(productCurrency);
+  const to = normaliseCurrency(orderCurrency);
+  if (from === to) return Math.round(catalogPrice * 100) / 100;
+  if (from === "CNY" && to === "GBP") return convertCnyToGbp(catalogPrice);
+  return convertGbpToCny(catalogPrice);
+}
+
+/** @deprecated Prefer unitPriceForOrder — assumes catalog price is CNY. */
 export function priceForCurrency(cnyPrice: number, currency: string | null | undefined): number {
   const code = normaliseCurrency(currency);
   return code === "GBP" ? convertCnyToGbp(cnyPrice) : cnyPrice;

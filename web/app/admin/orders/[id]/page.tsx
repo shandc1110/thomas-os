@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePackingSlipDownload, useShopify } from "@/hooks/useShopify";
-import { formatFulfilmentStatus, formatOrderPrice } from "@/lib/format";
+import { formatFulfilmentStatus, formatOrderPrice, formatPaymentStatus } from "@/lib/format";
 import { formatWeightKg } from "@/lib/weight";
 import type { OrderWithItems } from "@/types/order";
 
@@ -336,6 +336,16 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
             <dt className="w-28 shrink-0 text-muted">Payment</dt>
             <dd>
               {order.payment_method} · {order.currency}
+              {order.payment_status !== "unpaid" && (
+                <span className="ml-2 rounded-full bg-linen px-2 py-0.5 text-xs font-medium text-espresso ring-1 ring-sand">
+                  {formatPaymentStatus(order.payment_status)}
+                </span>
+              )}
+              {order.paid_at && (
+                <span className="mt-1 block text-xs text-muted">
+                  Paid {new Date(order.paid_at).toLocaleString("en-GB")}
+                </span>
+              )}
             </dd>
           </div>
           {order.notes && (

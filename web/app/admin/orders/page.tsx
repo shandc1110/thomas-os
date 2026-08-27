@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { downloadPackingSlip } from "@/lib/client/download-packing-slip";
-import { formatFulfilmentStatus, formatOrderPrice } from "@/lib/format";
+import { formatFulfilmentStatus, formatOrderPrice, formatPaymentStatus } from "@/lib/format";
 import { formatWeightKg } from "@/lib/weight";
 import type { OrderListItem } from "@/types/order";
 
@@ -323,6 +323,9 @@ export default function AdminOrdersPage() {
                       {order.customer_name} · {order.item_count}{" "}
                       {order.item_count === 1 ? "item" : "items"} ·{" "}
                       {formatOrderPrice(order.total, order.currency)}
+                      {order.payment_status !== "unpaid" && (
+                        <> · {formatPaymentStatus(order.payment_status)}</>
+                      )}
                     </p>
                     {order.created_at && (
                       <p className="mt-0.5 text-xs text-muted">

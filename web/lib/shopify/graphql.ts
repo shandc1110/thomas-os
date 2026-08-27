@@ -1,4 +1,5 @@
 import type { ShopifyGraphQLResponse } from "@/types/shopify";
+import { getShopifyAccessToken } from "./auth";
 import { getShopifyConfig, getShopifyGraphQLUrl } from "./config";
 
 export async function shopifyGraphQL<T>(
@@ -7,12 +8,13 @@ export async function shopifyGraphQL<T>(
 ): Promise<T> {
   const config = getShopifyConfig();
   const url = getShopifyGraphQLUrl(config);
+  const accessToken = await getShopifyAccessToken();
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Shopify-Access-Token": config.adminToken,
+      "X-Shopify-Access-Token": accessToken,
     },
     body: JSON.stringify({ query, variables }),
   });

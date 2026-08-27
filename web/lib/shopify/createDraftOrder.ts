@@ -1,5 +1,6 @@
 import type { OrderWithItems } from "@/types/order";
 import type { ShopifyPushResult } from "@/types/shopify";
+import { convertCnyToGbp, normaliseCurrency } from "@/lib/currency";
 import { computeTotalWeightGrams, gramsToKg } from "@/lib/weight";
 import { getShopifyDraftOrderAdminUrl, portalOrderTag } from "./config";
 import { shopifyGraphQL } from "./graphql";
@@ -25,6 +26,7 @@ type DraftOrderLineItem = {
   title: string;
   quantity: number;
   originalUnitPrice: string;
+  requiresShipping: boolean;
   sku?: string;
   weight?: { value: number; unit: "GRAMS" | "KILOGRAMS" };
 };
@@ -46,18 +48,44 @@ function splitCustomerName(order: OrderWithItems): { firstName: string; lastName
   };
 }
 
+/** Normalise UK phones to E.164 (+44…) for Shopify validation. */
+function toShopifyPhone(raw: string | null | undefined): string | undefined {
+  if (!raw?.trim()) return undefined;
+  let phone = raw.trim().replace(/[\s\-().]/g, "");
+
+  if (phone.startsWith("00")) phone = `+${phone.slice(2)}`;
+  if (phone.startsWith("+44")) return phone;
+  if (phone.startsWith("44") && phone.length >= 11) return `+${phone}`;
+  if (phone.startsWith("0")) return `+44${phone.slice(1)}`;
+  // Bare national number (e.g. 7xxx… mobile)
+  if (/^\d{10,11}$/.test(phone)) return `+44${phone}`;
+  if (phone.startsWith("+")) return phone;
+  return `+44${phone}`;
+}
+
 function buildDraftOrderNote(order: OrderWithItems): string {
   const orderNumber = order.order_number ?? String(order.id);
+  const orderCurrency = normaliseCurrency(order.currency);
   const lines = [
     `Portal Order: ${orderNumber}`,
     `WeChat ID: ${order.wechat_name}`,
     `Payment: ${order.payment_method ?? "N/A"}`,
-    `Currency: ${order.currency ?? "CNY"}`,
+    `Portal currency: ${orderCurrency}`,
   ];
+  if (orderCurrency === "CNY") {
+    lines.push("Shopify draft priced in GBP (converted from CNY).");
+  }
   if (order.notes) {
     lines.push(`Customer notes: ${order.notes}`);
   }
   return lines.join("\n");
+}
+
+/** Shopify store is GBP — convert CNY line prices when needed. */
+function unitPriceForShopify(order: OrderWithItems, unitPrice: number): string {
+  const orderCurrency = normaliseCurrency(order.currency);
+  const gbp = orderCurrency === "GBP" ? unitPrice : convertCnyToGbp(unitPrice);
+  return gbp.toFixed(2);
 }
 
 function buildLineItems(order: OrderWithItems): DraftOrderLineItem[] {
@@ -65,7 +93,8 @@ function buildLineItems(order: OrderWithItems): DraftOrderLineItem[] {
     const lineItem: DraftOrderLineItem = {
       title: item.product_name,
       quantity: item.quantity,
-      originalUnitPrice: item.price.toFixed(2),
+      originalUnitPrice: unitPriceForShopify(order, item.price),
+      requiresShipping: true,
     };
 
     if (item.product_sku) {
@@ -123,37 +152,34 @@ export async function pushOrderToShopify(order: OrderWithItems): Promise<Shopify
       })),
     );
 
-  const currency = order.currency === "GBP" ? "GBP" : "CNY";
   const tag = portalOrderTag(orderNumber);
 
+  const phone = toShopifyPhone(order.phone);
+
+  // Store currency is GBP — CNY is not enabled on Shopify Markets for this shop.
   const input = {
     email: order.email ?? undefined,
-    phone: order.phone,
+    phone,
     note: buildDraftOrderNote(order),
     tags: [tag, "portal-order", "chosen-by-chloe"],
-    presentmentCurrencyCode: currency,
+    presentmentCurrencyCode: "GBP",
     shippingAddress: {
       firstName,
       lastName,
       address1: order.address ?? "",
       zip: order.postcode ?? "",
-      phone: order.phone,
+      phone,
+      countryCode: "GB",
     },
     lineItems: buildLineItems(order),
-    ...(totalWeightGrams > 0
-      ? {
-          customAttributes: [
-            { key: "portal_order_number", value: orderNumber },
-            { key: "parcel_weight_kg", value: String(gramsToKg(totalWeightGrams)) },
-            { key: "wechat_id", value: order.wechat_name },
-          ],
-        }
-      : {
-          customAttributes: [
-            { key: "portal_order_number", value: orderNumber },
-            { key: "wechat_id", value: order.wechat_name },
-          ],
-        }),
+    customAttributes: [
+      { key: "portal_order_number", value: orderNumber },
+      { key: "wechat_id", value: order.wechat_name },
+      { key: "portal_currency", value: normaliseCurrency(order.currency) },
+      ...(totalWeightGrams > 0
+        ? [{ key: "parcel_weight_kg", value: String(gramsToKg(totalWeightGrams)) }]
+        : []),
+    ],
   };
 
   console.info(`[shopify] Creating draft order for ${orderNumber} with ${order.items.length} line items`);

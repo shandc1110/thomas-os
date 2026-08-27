@@ -42,6 +42,8 @@ function mapOrderRow(row: OrderRow): OrderRecord {
     address: (row.address as string | null) ?? null,
     postcode: (row.postcode as string | null) ?? null,
     payment_method: (row.payment_method as string | null) ?? null,
+    payment_status: ((row.payment_status as string) ?? "unpaid") as OrderRecord["payment_status"],
+    paid_at: (row.paid_at as string | null) ?? null,
     currency: (row.currency as string | null) ?? null,
     notes: (row.notes as string | null) ?? null,
     total_weight_grams: (row.total_weight_grams as number | null) ?? null,
