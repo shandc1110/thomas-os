@@ -87,9 +87,9 @@ export const BRAND_REGISTRY: BrandConfig[] = [
     description:
       "Shop Le Toy Van at UK RRP — FSC-certified wooden toys, dolls houses, and pretend play. Pre-order incoming stock.",
     logoUrl: "/brands/le-toy-van.png",
-    logoWidthClass: "max-w-[min(92vw,400px)]",
-    logoImageClass: "h-16 w-full object-contain sm:h-20",
-    logoCardClass: "max-h-20 w-full max-w-[min(100%,280px)] object-contain",
+    logoWidthClass: "max-w-[min(92vw,480px)]",
+    logoImageClass: "h-14 w-full object-contain sm:h-[4.5rem]",
+    logoCardClass: "max-h-[4.5rem] w-full max-w-[min(100%,320px)] object-contain",
     heroAccent: "#8b6f5c",
     metaTitle: "Le Toy Van | Chosen by Chloe",
     metaDescription:
