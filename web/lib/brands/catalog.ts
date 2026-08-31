@@ -6,20 +6,50 @@ import type { Product } from "@/lib/types";
 import { productBelongsToBrand } from "./match";
 import type { BrandConfig } from "./types";
 
-/** Active catalog products for the current tenant, sold-out last. */
-export async function fetchCatalogProducts(): Promise<Product[]> {
+const CATALOG_PAGE_SIZE = 1000;
+
+/** Paginate past Supabase/PostgREST default 1000-row cap. */
+async function fetchActiveProductRows(brandOrFilter?: string): Promise<Record<string, unknown>[]> {
   const tenant = getActiveTenant();
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("active", true)
-    .eq("organization_id", tenant.organizationId)
-    .order("created_at", { ascending: false });
+  const rows: Record<string, unknown>[] = [];
+  let from = 0;
 
-  if (error) throw new Error(error.message);
+  while (true) {
+    let query = supabase
+      .from("products")
+      .select("*")
+      .eq("active", true)
+      .eq("organization_id", tenant.organizationId)
+      .order("created_at", { ascending: false })
+      .range(from, from + CATALOG_PAGE_SIZE - 1);
 
-  return ((data ?? []) as Record<string, unknown>[])
+    if (brandOrFilter) {
+      query = query.or(brandOrFilter);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    const page = (data ?? []) as Record<string, unknown>[];
+    rows.push(...page);
+    if (page.length < CATALOG_PAGE_SIZE) break;
+    from += CATALOG_PAGE_SIZE;
+  }
+
+  return rows;
+}
+
+function brandOrFilter(brand: BrandConfig): string {
+  return brand.matchNames
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => `brand.ilike.%${name}%`)
+    .join(",");
+}
+
+function mapCatalogRows(rows: Record<string, unknown>[]): Product[] {
+  return rows
     .map(mapProduct)
     .filter((p) => p.is_listing_product !== false)
     .sort((a, b) => {
@@ -29,7 +59,15 @@ export async function fetchCatalogProducts(): Promise<Product[]> {
     });
 }
 
+/** Active catalog products for the current tenant, sold-out last. */
+export async function fetchCatalogProducts(): Promise<Product[]> {
+  return mapCatalogRows(await fetchActiveProductRows());
+}
+
 export async function fetchBrandProducts(brand: BrandConfig): Promise<Product[]> {
-  const all = await fetchCatalogProducts();
-  return all.filter((p) => productBelongsToBrand(p.brand, brand));
+  const orFilter = brandOrFilter(brand);
+  if (!orFilter) return [];
+
+  const rows = await fetchActiveProductRows(orFilter);
+  return mapCatalogRows(rows).filter((p) => productBelongsToBrand(p.brand, brand));
 }
