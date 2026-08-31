@@ -86,7 +86,7 @@ export const BRAND_REGISTRY: BrandConfig[] = [
     tagline: "Sustainable wooden toys",
     description:
       "Shop Le Toy Van at UK RRP — FSC-certified wooden toys, dolls houses, and pretend play. Pre-order incoming stock.",
-    logoUrl: "/brands/le-toy-van.svg",
+    logoUrl: "/brands/le-toy-van.png",
     logoWidthClass: "max-w-[min(92vw,260px)]",
     logoImageClass: "h-20 w-full object-contain sm:h-24",
     logoCardClass: "max-h-24 w-full max-w-[min(100%,200px)] object-contain",
