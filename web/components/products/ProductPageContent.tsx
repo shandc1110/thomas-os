@@ -6,9 +6,10 @@ import type { Product } from "@/lib/types";
 
 type ProductPageContentProps = {
   product: Product;
+  variants?: Product[];
 };
 
-export function ProductPageContent({ product }: ProductPageContentProps) {
+export function ProductPageContent({ product, variants = [] }: ProductPageContentProps) {
   const images = [
     ...(product.image_url ? [product.image_url] : []),
     ...product.gallery_images.filter((url) => url && url !== product.image_url),
@@ -20,7 +21,7 @@ export function ProductPageContent({ product }: ProductPageContentProps) {
       <div className="flex flex-col gap-6">
         <ProductInformation product={product} />
         <ProductAvailability product={product} />
-        <ProductPurchase product={product} />
+        <ProductPurchase product={product} variants={variants} />
       </div>
     </div>
   );

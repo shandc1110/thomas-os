@@ -21,6 +21,7 @@ export async function fetchCatalogProducts(): Promise<Product[]> {
 
   return ((data ?? []) as Record<string, unknown>[])
     .map(mapProduct)
+    .filter((p) => p.is_listing_product !== false)
     .sort((a, b) => {
       const aOut = getSellableStock(a) <= 0 ? 1 : 0;
       const bOut = getSellableStock(b) <= 0 ? 1 : 0;

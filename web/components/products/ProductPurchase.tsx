@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
 import {
@@ -8,42 +8,63 @@ import {
   isPresellOnly,
 } from "@/lib/presell";
 import type { Product } from "@/lib/types";
+import { ProductVariantSelect } from "@/components/products/ProductVariantSelect";
 
 type ProductPurchaseProps = {
   product: Product;
+  variants?: Product[];
 };
 
-export function ProductPurchase({ product }: ProductPurchaseProps) {
+export function ProductPurchase({ product, variants = [] }: ProductPurchaseProps) {
+  const sellableVariants = variants.length > 0 ? variants : [product];
+  const [selected, setSelected] = useState<Product>(sellableVariants[0]);
+  const [quantity, setQuantity] = useState(1);
   const { addItem, getQuantity } = useCart();
-  const [selected, setSelected] = useState(1);
 
-  const sellable = getSellableStock(product);
-  const presellOnly = isPresellOnly(product);
+  useEffect(() => {
+    setSelected(sellableVariants[0]);
+    setQuantity(1);
+  }, [product.id]);
+
+  const sellable = getSellableStock(selected);
+  const presellOnly = isPresellOnly(selected);
   const soldOut = sellable <= 0;
-  const inCart = getQuantity(product.id);
+  const inCart = getQuantity(selected.id);
   const remaining = Math.max(sellable - inCart, 0);
   const maxSelectable = Math.max(remaining, 1);
-  const clampedSelected = Math.min(selected, maxSelectable);
+  const clampedSelected = Math.min(quantity, maxSelectable);
   const canAdd = !soldOut && remaining > 0;
+  const showVariantPicker = sellableVariants.length > 1;
 
   function decrement() {
-    setSelected((value) => Math.max(1, value - 1));
+    setQuantity((value) => Math.max(1, value - 1));
   }
 
   function increment() {
-    setSelected((value) => Math.min(maxSelectable, value + 1));
+    setQuantity((value) => Math.min(maxSelectable, value + 1));
   }
 
   function handleAdd() {
     if (!canAdd) return;
-    addItem(product, clampedSelected);
-    setSelected(1);
+    addItem(selected, clampedSelected);
+    setQuantity(1);
   }
 
   return (
     <div className="space-y-4 border-t border-sand/80 pt-6">
+      {showVariantPicker ? (
+        <ProductVariantSelect
+          variants={sellableVariants}
+          selectedId={selected.id}
+          onChange={(variant) => {
+            setSelected(variant);
+            setQuantity(1);
+          }}
+        />
+      ) : null}
+
       <p className="text-xl font-semibold text-charcoal">
-        {formatPrice(product.price, product.currency)}
+        {formatPrice(selected.price, selected.currency)}
       </p>
 
       {soldOut ? (
@@ -61,7 +82,7 @@ export function ProductPurchase({ product }: ProductPurchaseProps) {
               type="button"
               onClick={decrement}
               disabled={clampedSelected <= 1}
-              aria-label={`Decrease quantity of ${product.name}`}
+              aria-label={`Decrease quantity of ${selected.name}`}
               className="flex h-10 w-10 items-center justify-center text-lg text-charcoal transition hover:bg-ivory disabled:opacity-40"
             >
               &minus;
@@ -73,7 +94,7 @@ export function ProductPurchase({ product }: ProductPurchaseProps) {
               type="button"
               onClick={increment}
               disabled={clampedSelected >= maxSelectable}
-              aria-label={`Increase quantity of ${product.name}`}
+              aria-label={`Increase quantity of ${selected.name}`}
               className="flex h-10 w-10 items-center justify-center bg-charcoal text-lg text-ivory transition hover:bg-charcoal/90 disabled:opacity-40"
             >
               +

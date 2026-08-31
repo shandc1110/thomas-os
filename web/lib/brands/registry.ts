@@ -53,6 +53,21 @@ export const BRAND_REGISTRY: BrandConfig[] = [
     defaultCurrency: "GBP",
   },
   {
+    slug: "grass-and-air",
+    name: "Grass & Air",
+    matchNames: ["grass & air", "grass and air"],
+    tagline: "Colour-changing wellies & rainwear",
+    description:
+      "Shop Grass & Air at UK RRP — colour-changing wellies, raincoats, puddlesuits and accessories. Pre-order incoming stock.",
+    logoUrl: "/brands/grass-and-air.png",
+    heroAccent: "#6b8f71",
+    metaTitle: "Grass & Air | Chosen by Chloe",
+    metaDescription:
+      "Grass & Air curated by Chosen by Chloe — kids wellies, rainwear, swimwear and accessories at UK RRP.",
+    active: true,
+    defaultCurrency: "GBP",
+  },
+  {
     slug: "connetix",
     name: "Connetix",
     matchNames: ["connetix"],
@@ -68,12 +83,18 @@ export const BRAND_REGISTRY: BrandConfig[] = [
     slug: "le-toy-van",
     name: "Le Toy Van",
     matchNames: ["le toy van"],
-    tagline: "Coming soon",
-    description: "Le Toy Van will appear here when stock is listed.",
-    heroAccent: "#6b5b55",
+    tagline: "Sustainable wooden toys",
+    description:
+      "Shop Le Toy Van at UK RRP — FSC-certified wooden toys, dolls houses, and pretend play. Pre-order incoming stock.",
+    logoUrl: "/brands/le-toy-van.png",
+    logoWidthClass: "max-w-[min(92vw,400px)]",
+    logoImageClass: "h-16 w-full object-contain sm:h-20",
+    logoCardClass: "max-h-20 w-full max-w-[min(100%,280px)] object-contain",
+    heroAccent: "#8b6f5c",
     metaTitle: "Le Toy Van | Chosen by Chloe",
-    metaDescription: "Le Toy Van wooden toys curated by Chosen by Chloe — coming soon.",
-    active: false,
+    metaDescription:
+      "Le Toy Van wooden toys curated by Chosen by Chloe — dolls houses, pretend play and classic toys at UK RRP.",
+    active: true,
     defaultCurrency: "GBP",
   },
 ];

@@ -1,6 +1,8 @@
+import { BrandCard } from "@/components/brands/BrandCard";
 import { BrandLogo } from "@/components/shop/BrandLogo";
 import { ChloeEditGrid } from "@/components/shop/ChloeEditGrid";
 import { cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
+import type { BrandConfig } from "@/lib/brands";
 import type { Product } from "@/lib/types";
 
 /**
@@ -79,6 +81,37 @@ export function ChloeEditSection({ products = [] }: { products?: Product[] }) {
             <ChloeEditGrid products={products} />
           </div>
         ) : null}
+      </div>
+    </section>
+  );
+}
+
+type BrandWithCount = {
+  brand: BrandConfig;
+  productCount: number;
+};
+
+/** Active brand collections — links to /brands/[slug]. */
+export function OurBrandsSection({ brands }: { brands: BrandWithCount[] }) {
+  if (brands.length === 0) return null;
+
+  return (
+    <section id="our-brands" className="scroll-mt-24 border-b border-sand/50 bg-ivory">
+      <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 md:py-16 lg:px-10">
+        <header className="max-w-lg md:ml-[18%] lg:ml-[22%]">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sage">
+            Our brands
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            Curated collections at UK RRP — pre-order incoming stock or shop what&apos;s ready now.
+          </p>
+        </header>
+
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {brands.map(({ brand, productCount }) => (
+            <BrandCard key={brand.slug} brand={brand} productCount={productCount} />
+          ))}
+        </div>
       </div>
     </section>
   );

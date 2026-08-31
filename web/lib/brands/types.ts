@@ -11,6 +11,12 @@ export type BrandConfig = {
   tagline: string;
   description: string;
   logoUrl?: string;
+  /** Wider logo container on brand page hero (Tailwind classes). */
+  logoWidthClass?: string;
+  /** Logo img sizing on brand page hero (Tailwind classes). */
+  logoImageClass?: string;
+  /** Logo sizing on homepage / hub brand cards (Tailwind classes). */
+  logoCardClass?: string;
   /** Soft accent for hero (CSS color). */
   heroAccent: string;
   metaTitle: string;

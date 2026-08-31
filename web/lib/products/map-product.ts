@@ -1,7 +1,19 @@
 import type { Product } from "@/lib/types";
 
+function tagValue(tags: string[], prefix: string): string | null {
+  const hit = tags.find((t) => t.startsWith(prefix));
+  return hit ? hit.slice(prefix.length) : null;
+}
+
 /** Map a Supabase products row to the storefront Product type. */
 export function mapProduct(row: Record<string, unknown>): Product {
+  const tags = Array.isArray(row.tags) ? (row.tags as string[]) : [];
+
+  const variantGroupFromTag = tagValue(tags, "cbc_vgroup:");
+  const variantCountFromTag = tagValue(tags, "cbc_vcount:");
+  const isVariantSku = tags.includes("cbc_variant");
+  const isListingTag = tags.includes("cbc_listing");
+
   return {
     id: row.id as string | number,
     sku: (row.sku as string | null) ?? null,
@@ -24,6 +36,20 @@ export function mapProduct(row: Record<string, unknown>): Product {
     active: (row.active as boolean | null) ?? true,
     status: (row.status as string | null) ?? null,
     assortment_status: (row.assortment_status as Product["assortment_status"]) ?? null,
+    variant_group_key:
+      (row.variant_group_key as string | null) ?? variantGroupFromTag ?? null,
+    is_listing_product:
+      row.is_listing_product != null
+        ? Boolean(row.is_listing_product)
+        : !isVariantSku || isListingTag,
+    variant_option1:
+      (row.variant_option1 as string | null) ?? tagValue(tags, "cbc_opt1:") ?? null,
+    variant_option2:
+      (row.variant_option2 as string | null) ?? tagValue(tags, "cbc_opt2:") ?? null,
+    variant_count:
+      row.variant_count != null
+        ? Number(row.variant_count)
+        : Number(variantCountFromTag ?? 1),
     weight_grams: (row.weight_grams as number | null) ?? null,
     length_mm: (row.length_mm as number | null) ?? null,
     width_mm: (row.width_mm as number | null) ?? null,

@@ -5,11 +5,15 @@ import { ShopHeader } from "@/components/shop/ShopHeader";
 import {
   ChloeEditSection,
   HomeHero,
+  OurBrandsSection,
   OurStoryMinimal,
   WhyWeChooseMinimal,
 } from "@/components/shop/HomeSections";
 import { ChloeEditTransition } from "@/components/shop/ChloeEditTransition";
 import { cbcV4Assets, cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
+import { getActiveBrands } from "@/lib/brands";
+import { fetchCatalogProducts } from "@/lib/brands/catalog";
+import { productBelongsToBrand } from "@/lib/brands/match";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
 
 const tenant = getActiveTenant();
@@ -34,7 +38,14 @@ export const metadata: Metadata = {
  * Spec: docs/chosen-by-chloe-storefront-spec.md
  * Do not redesign; populate Chloe Edit from catalogue in a later sprint only.
  */
-export default function Home() {
+export default async function Home() {
+  const brands = getActiveBrands();
+  const products = await fetchCatalogProducts();
+  const brandsWithCounts = brands.map((brand) => ({
+    brand,
+    productCount: products.filter((p) => productBelongsToBrand(p.brand, brand)).length,
+  }));
+
   return (
     <div className="relative min-h-full w-full">
       <RecoveryRedirect />
@@ -43,6 +54,7 @@ export default function Home() {
       <ChloeEditTransition>
         <ChloeEditSection products={[]} />
       </ChloeEditTransition>
+      <OurBrandsSection brands={brandsWithCounts} />
       <WhyWeChooseMinimal />
       <OurStoryMinimal />
       <ShopFooter />

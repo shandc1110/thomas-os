@@ -10,12 +10,14 @@ export function BrandHero({ brand, productCount }: BrandHeroProps) {
     <section className="mb-10 border-b border-sand/80 pb-10">
       <div className="mx-auto max-w-2xl px-1 text-center">
         {brand.logoUrl ? (
-          <div className="mx-auto mb-6 flex max-w-[200px] items-center justify-center">
+          <div
+            className={`mx-auto mb-6 flex items-center justify-center ${brand.logoWidthClass ?? "max-w-[200px]"}`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={brand.logoUrl}
               alt={brand.name}
-              className="h-12 w-full object-contain sm:h-14"
+              className={brand.logoImageClass ?? "h-12 w-full object-contain sm:h-14"}
             />
           </div>
         ) : null}

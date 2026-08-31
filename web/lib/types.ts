@@ -24,6 +24,12 @@ export type Product = {
   status: string | null;
   /** Commercial assortment — NULL = not yet reviewed (Sprint 05C). Not used for storefront filtering yet. */
   assortment_status: AssortmentStatus | null;
+  /** Shopify-style variant group (listing parent + hidden SKU rows). */
+  variant_group_key: string | null;
+  is_listing_product: boolean | null;
+  variant_option1: string | null;
+  variant_option2: string | null;
+  variant_count: number | null;
   weight_grams: number | null;
   length_mm: number | null;
   width_mm: number | null;

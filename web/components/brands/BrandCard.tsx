@@ -18,7 +18,10 @@ export function BrandCard({ brand, productCount }: BrandCardProps) {
           <img
             src={brand.logoUrl}
             alt=""
-            className="max-h-14 w-full max-w-[180px] object-contain transition duration-300 group-hover:scale-[1.02]"
+            className={
+              brand.logoCardClass ??
+              "max-h-14 w-full max-w-[180px] object-contain transition duration-300 group-hover:scale-[1.02]"
+            }
           />
         ) : (
           <span className="font-serif text-2xl text-charcoal">{brand.name}</span>

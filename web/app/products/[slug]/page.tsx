@@ -4,7 +4,7 @@ import { ProductPageContent } from "@/components/products/ProductPageContent";
 import { ShopFooter } from "@/components/shop/ShopFooter";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import { cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
-import { fetchProductBySlug } from "@/lib/products/lookup";
+import { fetchProductBySlug, fetchProductWithVariants } from "@/lib/products/lookup";
 import { buildProductSlug, productUrl } from "@/lib/products/slug";
 
 export const dynamic = "force-dynamic";
@@ -50,12 +50,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ProductPage({ params }: PageProps) {
   const { slug } = await params;
-  const product = await fetchProductBySlug(slug);
+  const result = await fetchProductWithVariants(slug);
 
-  if (!product) {
+  if (!result) {
     notFound();
   }
 
+  const { product, variants } = result;
   const canonicalSlug = buildProductSlug(product);
   if (slug !== canonicalSlug) {
     redirect(productUrl(product));
@@ -65,7 +66,7 @@ export default async function ProductPage({ params }: PageProps) {
     <div className="relative min-h-full w-full">
       <ShopHeader compact />
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
-        <ProductPageContent product={product} />
+        <ProductPageContent product={product} variants={variants} />
       </main>
       <ShopFooter />
     </div>
