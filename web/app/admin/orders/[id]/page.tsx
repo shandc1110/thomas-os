@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { usePackingSlipDownload, useShopify } from "@/hooks/useShopify";
 import { formatFulfilmentStatus, formatOrderPrice, formatPaymentStatus } from "@/lib/format";
 import { formatWeightKg } from "@/lib/weight";
 import type { OrderWithItems } from "@/types/order";
 
-type PageProps = {
-  params: Promise<{ id: string }>;
+type AdjacentOrderRef = {
+  id: string | number;
+  order_number: string | null;
 };
 
 function Notification({
@@ -28,9 +30,54 @@ function Notification({
   );
 }
 
-export default function AdminOrderDetailPage({ params }: PageProps) {
-  const [orderId, setOrderId] = useState<string | null>(null);
+function OrderNavButton({
+  href,
+  label,
+  orderNumber,
+  disabled,
+  align,
+}: {
+  href: string | null;
+  label: string;
+  orderNumber?: string | null;
+  disabled: boolean;
+  align: "left" | "right";
+}) {
+  const base =
+    "inline-flex min-w-[8.5rem] flex-col rounded-full px-4 py-2.5 text-sm ring-1 transition-colors";
+  if (disabled || !href) {
+    return (
+      <span
+        className={`${base} cursor-not-allowed bg-linen/50 text-muted ring-sand/40 ${
+          align === "right" ? "items-end text-right" : "items-start text-left"
+        }`}
+        aria-disabled="true"
+      >
+        <span className="font-semibold">{label}</span>
+        <span className="text-xs">End of list</span>
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className={`${base} bg-white text-espresso ring-sand/60 hover:bg-linen hover:ring-clay/40 ${
+        align === "right" ? "items-end text-right" : "items-start text-left"
+      }`}
+    >
+      <span className="font-semibold">{label}</span>
+      {orderNumber ? <span className="text-xs text-muted">{orderNumber}</span> : null}
+    </Link>
+  );
+}
+
+export default function AdminOrderDetailPage() {
+  const params = useParams<{ id: string }>();
+  const orderId = typeof params.id === "string" ? params.id : null;
   const [order, setOrder] = useState<OrderWithItems | null>(null);
+  const [previous, setPrevious] = useState<AdjacentOrderRef | null>(null);
+  const [next, setNext] = useState<AdjacentOrderRef | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<"fulfill" | "cancel" | null>(null);
@@ -40,32 +87,49 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
   } | null>(null);
 
   useEffect(() => {
-    params.then((p) => setOrderId(p.id));
-  }, [params]);
-
-  useEffect(() => {
     if (!orderId) return;
 
+    let cancelled = false;
+
     async function load() {
+      setLoading(true);
+      setError(null);
+      setActionMessage(null);
       try {
         const response = await fetch(`/api/orders/${orderId}`);
         const result = (await response.json()) as {
           success: boolean;
           order?: OrderWithItems;
+          previous?: AdjacentOrderRef | null;
+          next?: AdjacentOrderRef | null;
           error?: string;
         };
+        if (cancelled) return;
         if (!response.ok || !result.success || !result.order) {
+          setOrder(null);
+          setPrevious(null);
+          setNext(null);
           setError(result.error ?? "Order not found.");
           return;
         }
         setOrder(result.order);
+        setPrevious(result.previous ?? null);
+        setNext(result.next ?? null);
       } catch {
-        setError("Network error. Please refresh the page.");
+        if (!cancelled) {
+          setOrder(null);
+          setPrevious(null);
+          setNext(null);
+          setError("Network error. Please refresh the page.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [orderId]);
 
   const orderNumber = order?.order_number ?? orderId ?? "";
@@ -188,6 +252,26 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
           )}
         </span>
       </header>
+
+      <nav
+        className="mb-6 flex items-center justify-between gap-3"
+        aria-label="Order navigation"
+      >
+        <OrderNavButton
+          href={previous ? `/admin/orders/${previous.id}` : null}
+          label="← Previous"
+          orderNumber={previous?.order_number}
+          disabled={!previous}
+          align="left"
+        />
+        <OrderNavButton
+          href={next ? `/admin/orders/${next.id}` : null}
+          label="Next →"
+          orderNumber={next?.order_number}
+          disabled={!next}
+          align="right"
+        />
+      </nav>
 
       <h1 className="font-serif text-3xl text-espresso">
         {order.order_number ?? order.id}
@@ -388,6 +472,26 @@ export default function AdminOrderDetailPage({ params }: PageProps) {
           </span>
         </div>
       </section>
+
+      <nav
+        className="mt-8 flex items-center justify-between gap-3"
+        aria-label="Order navigation"
+      >
+        <OrderNavButton
+          href={previous ? `/admin/orders/${previous.id}` : null}
+          label="← Previous"
+          orderNumber={previous?.order_number}
+          disabled={!previous}
+          align="left"
+        />
+        <OrderNavButton
+          href={next ? `/admin/orders/${next.id}` : null}
+          label="Next →"
+          orderNumber={next?.order_number}
+          disabled={!next}
+          align="right"
+        />
+      </nav>
     </main>
   );
 }

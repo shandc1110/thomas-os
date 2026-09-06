@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { staffRoute } from "@/lib/thomas/api/staff-route";
 import { getOrganizationId } from "@/lib/thomas/tenant/scope";
-import { cancelOrder, getOrderById, markOrderFulfilled } from "@/lib/orders";
+import {
+  cancelOrder,
+  getAdjacentOrders,
+  getOrderById,
+  markOrderFulfilled,
+} from "@/lib/orders";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const GET = staffRoute<{ id: string }>(async ({ supabase, params }) => {
   const orgId = getOrganizationId();
-  const { order, error } = await getOrderById(supabase, params.id, orgId);
+  const [{ order, error }, adjacent] = await Promise.all([
+    getOrderById(supabase, params.id, orgId),
+    getAdjacentOrders(supabase, params.id, orgId),
+  ]);
 
   if (error || !order) {
     return NextResponse.json(
@@ -17,7 +25,12 @@ export const GET = staffRoute<{ id: string }>(async ({ supabase, params }) => {
     );
   }
 
-  return NextResponse.json({ success: true, order });
+  return NextResponse.json({
+    success: true,
+    order,
+    previous: adjacent.previous,
+    next: adjacent.next,
+  });
 });
 
 export const PATCH = staffRoute<{ id: string }>(async ({ request, supabase, params }) => {

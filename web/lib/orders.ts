@@ -169,6 +169,62 @@ export async function getOrderById(
   };
 }
 
+export type AdjacentOrderRef = {
+  id: string | number;
+  order_number: string | null;
+};
+
+/**
+ * Neighbours in the same order as the admin list (created_at desc).
+ * `previous` = newer order (above in list), `next` = older order (below in list).
+ */
+export async function getAdjacentOrders(
+  supabase: SupabaseClient,
+  orderId: string,
+  organizationId?: string,
+): Promise<{
+  previous: AdjacentOrderRef | null;
+  next: AdjacentOrderRef | null;
+  error: string | null;
+}> {
+  let query = supabase
+    .from("orders")
+    .select("id, order_number, created_at")
+    .order("created_at", { ascending: false });
+
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("getAdjacentOrders failed:", error.message);
+    return { previous: null, next: null, error: error.message };
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string | number;
+    order_number: string | null;
+    created_at: string;
+  }>;
+  const index = rows.findIndex((row) => String(row.id) === String(orderId));
+  if (index === -1) {
+    return { previous: null, next: null, error: null };
+  }
+
+  const toRef = (row: (typeof rows)[number]): AdjacentOrderRef => ({
+    id: row.id,
+    order_number: row.order_number,
+  });
+
+  return {
+    previous: index > 0 ? toRef(rows[index - 1]) : null,
+    next: index < rows.length - 1 ? toRef(rows[index + 1]) : null,
+    error: null,
+  };
+}
+
 export function buildPackingSlipData(order: OrderWithItems): PackingSlipData {
   const orderNumber = order.order_number ?? String(order.id);
   const items = order.items.map((item) => {
