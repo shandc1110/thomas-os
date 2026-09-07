@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { RecoveryRedirect } from "@/components/thomas/RecoveryRedirect";
 import { ShopFooter } from "@/components/shop/ShopFooter";
 import { ShopHeader } from "@/components/shop/ShopHeader";
+import { ChosenExperienceSection } from "@/components/shop/ChosenExperienceSection";
 import {
   ChloeEditSection,
   HomeHero,
@@ -56,6 +57,7 @@ export default async function Home() {
       </ChloeEditTransition>
       <OurBrandsSection brands={brandsWithCounts} />
       <WhyWeChooseMinimal />
+      <ChosenExperienceSection />
       <OurStoryMinimal />
       <ShopFooter />
     </div>
