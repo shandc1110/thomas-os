@@ -7,6 +7,7 @@ import {
   getSellableStock,
   isPresellOnly,
 } from "@/lib/presell";
+import { resolveChannelCommercial } from "@/lib/storefront/commercial";
 import type { Product } from "@/lib/types";
 import { ProductVariantSelect } from "@/components/products/ProductVariantSelect";
 
@@ -15,6 +16,12 @@ type ProductPurchaseProps = {
   variants?: Product[];
 };
 
+/**
+ * PDP purchase controls.
+ *
+ * Display + basket use Shopify-channel GBP. Server re-resolves shopify_price
+ * on POST /api/orders — the cart never settles community CNY for UK lines.
+ */
 export function ProductPurchase({ product, variants = [] }: ProductPurchaseProps) {
   const sellableVariants = variants.length > 0 ? variants : [product];
   const [selected, setSelected] = useState<Product>(sellableVariants[0]);
@@ -33,7 +40,10 @@ export function ProductPurchase({ product, variants = [] }: ProductPurchaseProps
   const remaining = Math.max(sellable - inCart, 0);
   const maxSelectable = Math.max(remaining, 1);
   const clampedSelected = Math.min(quantity, maxSelectable);
-  const canAdd = !soldOut && remaining > 0;
+
+  const shopifyCommercial = resolveChannelCommercial(selected, "shopify");
+  const ukPriceReady = shopifyCommercial.priceStatus === "configured";
+  const canAdd = !soldOut && remaining > 0 && ukPriceReady;
   const showVariantPicker = sellableVariants.length > 1;
 
   function decrement() {
@@ -46,7 +56,7 @@ export function ProductPurchase({ product, variants = [] }: ProductPurchaseProps
 
   function handleAdd() {
     if (!canAdd) return;
-    addItem(selected, clampedSelected);
+    addItem(selected, clampedSelected, "shopify");
     setQuantity(1);
   }
 
@@ -63,9 +73,18 @@ export function ProductPurchase({ product, variants = [] }: ProductPurchaseProps
         />
       ) : null}
 
-      <p className="text-xl font-semibold text-charcoal">
-        {formatPrice(selected.price, selected.currency)}
-      </p>
+      {ukPriceReady ? (
+        <p className="font-serif text-2xl text-charcoal">
+          {formatPrice(shopifyCommercial.channelPrice!, shopifyCommercial.channelCurrency!)}
+        </p>
+      ) : (
+        <div className="space-y-1">
+          <p className="font-serif text-xl text-charcoal">Price unavailable</p>
+          <p className="text-xs text-muted">
+            A UK Shopify price has not been set for this product yet.
+          </p>
+        </div>
+      )}
 
       {soldOut ? (
         <button
@@ -75,9 +94,17 @@ export function ProductPurchase({ product, variants = [] }: ProductPurchaseProps
         >
           Sold out
         </button>
+      ) : !ukPriceReady ? (
+        <button
+          type="button"
+          disabled
+          className="w-full cursor-not-allowed border border-sand py-3 text-sm font-medium text-muted"
+        >
+          Unavailable
+        </button>
       ) : (
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between border border-sand bg-white p-1">
+          <div className="flex items-center justify-between border border-sand bg-transparent p-1">
             <button
               type="button"
               onClick={decrement}

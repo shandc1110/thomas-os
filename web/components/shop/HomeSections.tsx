@@ -3,7 +3,7 @@ import { BrandLogo } from "@/components/shop/BrandLogo";
 import { ChloeEditGrid } from "@/components/shop/ChloeEditGrid";
 import { cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
 import type { BrandConfig } from "@/lib/brands";
-import type { Product } from "@/lib/types";
+import type { StorefrontProduct } from "@/lib/storefront";
 
 /**
  * Approved Sprint 02C/03 hero — DO NOT redesign.
@@ -62,7 +62,7 @@ export function HomeHero() {
  * Sprint 03B — The Chloe Edit (visual refinement).
  * Grounded left alignment (shopping begins); quiet title; empty grid until catalogue.
  */
-export function ChloeEditSection({ products = [] }: { products?: Product[] }) {
+export function ChloeEditSection({ products = [] }: { products?: StorefrontProduct[] }) {
   return (
     <section id="chloe-edit" className="scroll-mt-24 border-b border-sand/50 bg-white">
       <div className="mx-auto max-w-6xl px-5 pb-14 pt-8 sm:px-8 sm:pb-16 sm:pt-10 md:pb-20 md:pt-12 lg:px-10">

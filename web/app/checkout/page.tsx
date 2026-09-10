@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { BrandLogo } from "@/components/shop/BrandLogo";
-import { getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate, unitPriceForOrder } from "@/lib/currency";
+import { getDisplayCnyToGbpMarkup, getDisplayCnyToGbpRate } from "@/lib/currency";
 import { formatOrderPrice } from "@/lib/format";
+import { displayUnitPriceForCartLine } from "@/lib/storefront/order-pricing";
 import { STRIPE_PAYMENT_METHOD } from "@/lib/stripe/constants";
 import { getSellableStock, formatExpectedArrival, isPresellOnly } from "@/lib/presell";
 import type { CreateOrderResponse, StockIssue } from "@/lib/order";
@@ -44,7 +45,8 @@ const CURRENCIES = [
 ];
 
 export default function CheckoutPage() {
-  const { items, totalItems, hydrated, setQuantity, removeItem, clear } = useCart();
+  const { items, totalItems, hydrated, setQuantity, removeItem, clear, isShopifyCart } =
+    useCart();
   const [form, setForm] = useState<FormState>(initialForm);
   const [currencyTouched, setCurrencyTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +58,14 @@ export default function CheckoutPage() {
   const [confirmationEmailSent, setConfirmationEmailSent] = useState(false);
 
   useEffect(() => {
-    if (!hydrated || currencyTouched || items.length === 0) return;
+    if (!hydrated || items.length === 0) return;
+    if (isShopifyCart) {
+      // UK storefront basket — lock GBP (Shopify commercial).
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional sync from cart channel
+      setForm((prev) => (prev.currency === "GBP" ? prev : { ...prev, currency: "GBP" }));
+      return;
+    }
+    if (currencyTouched) return;
     const hasGbp = items.some((item) => (item.product.currency ?? "CNY").toUpperCase() === "GBP");
     const hasCny = items.some((item) => (item.product.currency ?? "CNY").toUpperCase() !== "GBP");
     if (hasGbp && !hasCny) {
@@ -64,30 +73,32 @@ export default function CheckoutPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-shot default from cart contents
       setForm((prev) => (prev.currency === "GBP" ? prev : { ...prev, currency: "GBP" }));
     }
-  }, [hydrated, items, currencyTouched]);
+  }, [hydrated, items, currencyTouched, isShopifyCart]);
 
   const displayTotal = useMemo(() => {
-    return items.reduce(
-      (sum, item) =>
-        sum +
-        unitPriceForOrder(item.product.price ?? 0, item.product.currency, form.currency) *
-          item.quantity,
-      0,
-    );
-  }, [items, form.currency]);
+    return items.reduce((sum, item) => {
+      const channel = isShopifyCart ? "shopify" : item.pricingChannel ?? "community";
+      const { unitPrice } = displayUnitPriceForCartLine(
+        item.product,
+        channel,
+        form.currency === "GBP" ? "GBP" : "CNY",
+      );
+      return sum + unitPrice * item.quantity;
+    }, 0);
+  }, [items, form.currency, isShopifyCart]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function itemDisplayPrice(
-    catalogPrice: number | null | undefined,
-    productCurrency: string | null | undefined,
-  ): string {
-    return formatOrderPrice(
-      unitPriceForOrder(catalogPrice ?? 0, productCurrency, form.currency),
-      form.currency,
+  function itemDisplayPrice(item: (typeof items)[number]): string {
+    const channel = isShopifyCart ? "shopify" : item.pricingChannel ?? "community";
+    const { unitPrice, currency } = displayUnitPriceForCartLine(
+      item.product,
+      channel,
+      form.currency === "GBP" ? "GBP" : "CNY",
     );
+    return formatOrderPrice(unitPrice, currency);
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -110,9 +121,10 @@ export default function CheckoutPage() {
             address: form.address,
             postcode: form.postcode,
             payment_method: form.payment_method,
-            currency: form.currency,
+            currency: isShopifyCart ? "GBP" : form.currency,
             notes: form.notes,
           },
+          pricing_channel: isShopifyCart ? "shopify" : "community",
           items: items.map((item) => ({
             product_id: item.product.id,
             quantity: item.quantity,
@@ -230,7 +242,7 @@ export default function CheckoutPage() {
                   <img
                     src={item.product.image_url}
                     alt={item.product.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain object-center"
                   />
                 )}
               </div>
@@ -239,9 +251,7 @@ export default function CheckoutPage() {
                 <p className="truncate font-serif text-base text-espresso">
                   {item.product.name}
                 </p>
-                <p className="text-sm text-muted">
-                  {itemDisplayPrice(item.product.price, item.product.currency)}
-                </p>
+                <p className="text-sm text-muted">{itemDisplayPrice(item)}</p>
                 {isPresellOnly(item.product) && arrival && (
                   <p className="text-xs text-clay">Pre-order · arrives {arrival}</p>
                 )}
@@ -376,22 +386,33 @@ export default function CheckoutPage() {
           </p>
         )}
 
-        <Select
-          label="Currency"
-          value={form.currency}
-          onChange={(v) => {
-            setCurrencyTouched(true);
-            update("currency", v);
-          }}
-          options={CURRENCIES}
-          required
-        />
+        {isShopifyCart ? (
+          <div className="rounded-2xl border border-sand bg-linen px-4 py-3 text-sm text-muted">
+            Currency: <span className="font-medium text-charcoal">GBP (£)</span>
+            <p className="mt-1 text-xs">
+              UK website prices use the Shopify commercial price — not community CNY and not FX.
+            </p>
+          </div>
+        ) : (
+          <>
+            <Select
+              label="Currency"
+              value={form.currency}
+              onChange={(v) => {
+                setCurrencyTouched(true);
+                update("currency", v);
+              }}
+              options={CURRENCIES}
+              required
+            />
 
-        {form.currency === "GBP" && (
-          <p className="text-xs text-muted">
-            GBP prices use ¥{getDisplayCnyToGbpRate()} = £1 with a{" "}
-            {Math.round((getDisplayCnyToGbpMarkup() - 1) * 100)}% FX markup.
-          </p>
+            {form.currency === "GBP" && (
+              <p className="text-xs text-muted">
+                GBP prices use ¥{getDisplayCnyToGbpRate()} = £1 with a{" "}
+                {Math.round((getDisplayCnyToGbpMarkup() - 1) * 100)}% FX markup.
+              </p>
+            )}
+          </>
         )}
 
         <label className="block">

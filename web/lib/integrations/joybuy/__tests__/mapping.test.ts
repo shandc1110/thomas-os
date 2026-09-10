@@ -23,6 +23,7 @@ function baseProduct(overrides: Partial<Product> = {}): Product {
     price: 99,
     retail_price: 120,
     shopify_price: 10,
+    joybuy_price: null,
     cost_price: 40,
     currency: "CNY",
     image_url: "https://cdn.example/a.jpg",
@@ -43,6 +44,7 @@ function baseProduct(overrides: Partial<Product> = {}): Product {
     length_mm: 100,
     width_mm: 80,
     height_mm: 40,
+    tags: [],
     created_at: null,
     updated_at: null,
     ...overrides,
@@ -129,16 +131,18 @@ describe("Joybuy inventory mapping", () => {
 });
 
 describe("Joybuy price mapping", () => {
-  it("maps sell price without cost", () => {
-    const payload = buildJoybuyPricePayload(baseProduct({ price: 89.5, cost_price: 20 }));
-    expect(payload.price).toBe(89.5);
-    expect(payload.currency).toBe("CNY");
+  it("maps explicit joybuy_price GBP — never community CNY", () => {
+    const payload = buildJoybuyPricePayload(
+      baseProduct({ price: 95, currency: "CNY", joybuy_price: 29.99, cost_price: 20 }),
+    );
+    expect(payload.price).toBe(29.99);
+    expect(payload.currency).toBe("GBP");
     expect(payload).not.toHaveProperty("cost_price");
   });
 
-  it("nulls non-positive prices", () => {
-    expect(buildJoybuyPricePayload(baseProduct({ price: 0 })).price).toBeNull();
-    expect(buildJoybuyPricePayload(baseProduct({ price: null })).price).toBeNull();
+  it("does not fall back to products.price when joybuy_price missing", () => {
+    expect(buildJoybuyPricePayload(baseProduct({ price: 89.5, joybuy_price: null })).price).toBeNull();
+    expect(buildJoybuyPricePayload(baseProduct({ price: 89.5, joybuy_price: 0 })).price).toBeNull();
   });
 });
 

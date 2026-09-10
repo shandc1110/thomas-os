@@ -49,7 +49,7 @@ export function ProductVariantSelect({
             onChange={(e) =>
               pick(e.target.value || null, normalizeOption(selected.variant_option2))
             }
-            className="mt-1.5 w-full border border-sand bg-white px-3 py-2.5 text-sm outline-none focus:border-sage"
+            className="mt-1.5 w-full border border-sand bg-transparent px-3 py-2.5 text-sm outline-none focus:border-sage"
           >
             {option1Values.map((v) => (
               <option key={v} value={v}>{v}</option>
@@ -64,7 +64,7 @@ export function ProductVariantSelect({
             onChange={(e) =>
               pick(normalizeOption(selected.variant_option1), e.target.value || null)
             }
-            className="mt-1.5 w-full border border-sand bg-white px-3 py-2.5 text-sm outline-none focus:border-sage"
+            className="mt-1.5 w-full border border-sand bg-transparent px-3 py-2.5 text-sm outline-none focus:border-sage"
           >
             {option2Values.map((v) => (
               <option key={v} value={v}>{v}</option>
@@ -85,7 +85,7 @@ export function ProductVariantSelect({
           const next = variants.find((v) => String(v.id) === e.target.value);
           if (next) onChange(next);
         }}
-        className="mt-1.5 w-full border border-sand bg-white px-3 py-2.5 text-sm outline-none focus:border-sage"
+        className="mt-1.5 w-full border border-sand bg-transparent px-3 py-2.5 text-sm outline-none focus:border-sage"
       >
         {variants.map((variant) => (
           <option key={String(variant.id)} value={String(variant.id)}>

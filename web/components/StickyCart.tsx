@@ -3,27 +3,41 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useCart } from "@/context/CartContext";
-import { normaliseCurrency, unitPriceForOrder } from "@/lib/currency";
 import { formatOrderPrice } from "@/lib/format";
+import { displayUnitPriceForCartLine } from "@/lib/storefront/order-pricing";
 
 export default function StickyCart() {
-  const { items, totalItems, hydrated } = useCart();
+  const { items, totalItems, hydrated, isShopifyCart } = useCart();
   const hasItems = hydrated && totalItems > 0;
 
   const { displayTotal, displayCurrency } = useMemo(() => {
+    if (isShopifyCart) {
+      let total = 0;
+      for (const item of items) {
+        const { unitPrice } = displayUnitPriceForCartLine(item.product, "shopify", "GBP");
+        total += unitPrice * item.quantity;
+      }
+      return { displayTotal: total, displayCurrency: "GBP" as const };
+    }
+
     const currencies = new Set(
-      items.map((item) => normaliseCurrency(item.product.currency)),
+      items.map((item) =>
+        (item.product.currency ?? "CNY").trim().toUpperCase() === "GBP" ? "GBP" : "CNY",
+      ),
     );
     const displayCurrency =
       currencies.size === 1 ? [...currencies][0]! : currencies.has("GBP") ? "GBP" : "CNY";
     let total = 0;
     for (const item of items) {
-      total +=
-        unitPriceForOrder(item.product.price ?? 0, item.product.currency, displayCurrency) *
-        item.quantity;
+      const { unitPrice } = displayUnitPriceForCartLine(
+        item.product,
+        item.pricingChannel ?? "community",
+        displayCurrency === "GBP" ? "GBP" : "CNY",
+      );
+      total += unitPrice * item.quantity;
     }
     return { displayTotal: total, displayCurrency };
-  }, [items]);
+  }, [items, isShopifyCart]);
 
   return (
     <div

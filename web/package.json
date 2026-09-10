@@ -12,7 +12,9 @@
     "import:products": "tsx scripts/import-products.ts",
     "upload:images": "tsx scripts/upload-product-images.ts",
     "match:images": "tsx scripts/match-drive-images.ts",
-    "import:tonies-images": "tsx scripts/import-tonies-images.ts"
+    "import:tonies-images": "tsx scripts/import-tonies-images.ts",
+    "audit:packshot-bg": "tsx scripts/audit-product-image-backgrounds.ts",
+    "derive:packshot-bg": "tsx scripts/derive-packshot-transparent.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",
@@ -24,6 +26,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.17.1",
+    "server-only": "^0.0.1",
     "stripe": "^22.3.2",
     "xlsx": "^0.18.5"
   },

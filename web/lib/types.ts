@@ -8,11 +8,15 @@ export type Product = {
   category: string | null;
   description: string | null;
   barcode: string | null;
+  /** Community / console source selling price (Mideer: CNY). */
   price: number | null;
   retail_price: number | null;
+  /** Explicit Chosen by Chloe UK / Shopify channel price in GBP. */
   shopify_price: number | null;
+  /** Explicit Joybuy UK channel list price in GBP. Independent of shopify_price. */
+  joybuy_price: number | null;
   cost_price: number | null;
-  /** Native currency of catalog prices (CNY for MiDeer, GBP for Tonies RRP). */
+  /** Native currency of community/source catalog price (CNY for Mideer, GBP for Micro/Tonies). */
   currency: string | null;
   image_url: string | null;
   gallery_images: string[];
@@ -22,7 +26,7 @@ export type Product = {
   expected_arrival_month: string | null;
   active: boolean | null;
   status: string | null;
-  /** Commercial assortment — NULL = not yet reviewed (Sprint 05C). Not used for storefront filtering yet. */
+  /** Commercial assortment — NULL = not yet reviewed. Storefront eligibility requires 'active'. */
   assortment_status: AssortmentStatus | null;
   /** Shopify-style variant group (listing parent + hidden SKU rows). */
   variant_group_key: string | null;
@@ -34,6 +38,8 @@ export type Product = {
   length_mm: number | null;
   width_mm: number | null;
   height_mm: number | null;
+  /** Operational / variant tags (e.g. cbc_vgroup). Projected onto StorefrontProduct. */
+  tags: string[];
   created_at: string | null;
   updated_at: string | null;
 };

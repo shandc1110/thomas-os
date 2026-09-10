@@ -6,14 +6,20 @@ type ProductInformationProps = {
   product: Product;
 };
 
+/**
+ * PDP product identity + content.
+ * Does not invent missing description or category copy.
+ */
 export function ProductInformation({ product }: ProductInformationProps) {
   const brandSlug = brandSlugFromProductBrand(product.brand);
   const dims = formatDimensions(product);
+  const description = product.description?.trim() || null;
+  const category = product.category?.trim() || null;
 
   return (
-    <header className="space-y-4">
+    <header className="space-y-5">
       {product.brand ? (
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sage">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sage">
           {brandSlug ? (
             <Link href={`/brands/${brandSlug}`} className="hover:text-charcoal">
               {product.brand}
@@ -24,25 +30,23 @@ export function ProductInformation({ product }: ProductInformationProps) {
         </p>
       ) : null}
 
-      <h1 className="font-serif text-2xl leading-snug text-charcoal sm:text-3xl">
+      <h1 className="font-serif text-2xl leading-snug text-charcoal sm:text-3xl md:text-[2.1rem]">
         {product.name}
       </h1>
 
+      {category ? <p className="text-sm text-muted">{category}</p> : null}
+
+      {description ? (
+        <p className="max-w-prose text-sm leading-relaxed text-muted sm:text-[0.95rem]">
+          {description}
+        </p>
+      ) : null}
+
       {product.sku ? (
-        <p className="text-xs uppercase tracking-[0.14em] text-muted">SKU {product.sku}</p>
+        <p className="text-[11px] uppercase tracking-[0.14em] text-muted/80">SKU {product.sku}</p>
       ) : null}
 
-      {product.category ? (
-        <p className="text-sm text-muted">{product.category}</p>
-      ) : null}
-
-      {product.description ? (
-        <p className="text-sm leading-relaxed text-muted">{product.description}</p>
-      ) : null}
-
-      {dims ? (
-        <p className="text-xs text-muted">{dims}</p>
-      ) : null}
+      {dims ? <p className="text-xs text-muted">{dims}</p> : null}
     </header>
   );
 }

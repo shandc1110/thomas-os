@@ -37,7 +37,7 @@ export function ShopHeader({ compact = false }: ShopHeaderProps) {
   }, [menuOpen]);
 
   return (
-    <header className="relative z-30 border-b border-sand/80 bg-ivory/90 backdrop-blur-sm">
+    <header className="relative z-30 bg-storefront/95 backdrop-blur-sm">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-4 md:py-5">
         <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-8">
           <button
@@ -111,7 +111,7 @@ export function ShopHeader({ compact = false }: ShopHeaderProps) {
       {menuOpen && (
         <div
           id="mobile-shop-menu"
-          className="border-t border-sand bg-ivory px-4 py-6 lg:hidden"
+          className="border-t border-sand/60 bg-storefront px-4 py-6 lg:hidden"
         >
           <ShopNav stacked onNavigate={() => setMenuOpen(false)} />
           <Link

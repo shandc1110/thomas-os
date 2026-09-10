@@ -1,15 +1,15 @@
+/**
+ * Public storefront catalog — assortment-active products for the current tenant.
+ * Eligibility: assortment_status = 'active' (never products.active alone).
+ */
 import { NextResponse } from "next/server";
 import { brandSlugFromProductBrand, getBrandBySlug } from "@/lib/brands";
-import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
+import { getStorefrontProducts } from "@/lib/storefront";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Public storefront catalog — active products for the current tenant. */
 export async function GET(request: Request) {
-  const tenant = getActiveTenant();
-  const supabase = getSupabaseAdmin();
   const brandSlug = new URL(request.url).searchParams.get("brand")?.trim().toLowerCase();
 
   if (brandSlug) {
@@ -19,23 +19,17 @@ export async function GET(request: Request) {
     }
   }
 
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("active", true)
-    .eq("organization_id", tenant.organizationId)
-    .order("created_at", { ascending: false });
+  try {
+    let products = await getStorefrontProducts();
+    if (brandSlug) {
+      products = products.filter(
+        (p) => brandSlugFromProductBrand(p.brand) === brandSlug,
+      );
+    }
 
-  if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, products, brand: brandSlug ?? null });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Catalog error";
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
-
-  let products = data ?? [];
-  if (brandSlug) {
-    products = products.filter(
-      (row) => brandSlugFromProductBrand((row as { brand?: string | null }).brand) === brandSlug,
-    );
-  }
-
-  return NextResponse.json({ success: true, products, brand: brandSlug ?? null });
 }

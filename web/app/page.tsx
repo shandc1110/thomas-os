@@ -15,6 +15,7 @@ import { cbcV4Assets, cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
 import { getActiveBrands } from "@/lib/brands";
 import { fetchCatalogProducts } from "@/lib/brands/catalog";
 import { productBelongsToBrand } from "@/lib/brands/match";
+import { getChloeEditStorefrontProducts } from "@/lib/storefront/chloe-edit";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
 
 const tenant = getActiveTenant();
@@ -37,7 +38,7 @@ export const metadata: Metadata = {
 /**
  * Chosen by Chloe Storefront Shell V1 — LOCKED.
  * Spec: docs/chosen-by-chloe-storefront-spec.md
- * Do not redesign; populate Chloe Edit from catalogue in a later sprint only.
+ * Chloe Edit homepage slice is curation-driven (max 6 by position).
  */
 export default async function Home() {
   const brands = getActiveBrands();
@@ -47,13 +48,20 @@ export default async function Home() {
     productCount: products.filter((p) => productBelongsToBrand(p.brand, brand)).length,
   }));
 
+  let chloeEditProducts: Awaited<ReturnType<typeof getChloeEditStorefrontProducts>> = [];
+  try {
+    chloeEditProducts = await getChloeEditStorefrontProducts({ limit: 6 });
+  } catch {
+    chloeEditProducts = [];
+  }
+
   return (
     <div className="relative min-h-full w-full">
       <RecoveryRedirect />
       <ShopHeader compact />
       <HomeHero />
       <ChloeEditTransition>
-        <ChloeEditSection products={[]} />
+        <ChloeEditSection products={chloeEditProducts} />
       </ChloeEditTransition>
       <OurBrandsSection brands={brandsWithCounts} />
       <WhyWeChooseMinimal />

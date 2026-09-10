@@ -2,14 +2,18 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
 import { getSellableStock } from "@/lib/presell";
 import { mapProduct } from "@/lib/products/map-product";
+import { isStorefrontEligible } from "@/lib/storefront/eligibility";
 import type { Product } from "@/lib/types";
 import { productBelongsToBrand } from "./match";
 import type { BrandConfig } from "./types";
 
 const CATALOG_PAGE_SIZE = 1000;
 
-/** Paginate past Supabase/PostgREST default 1000-row cap. */
-async function fetchActiveProductRows(brandOrFilter?: string): Promise<Record<string, unknown>[]> {
+/**
+ * Paginate assortment-active products (storefront eligibility).
+ * Never uses products.active as the visibility rule.
+ */
+async function fetchStorefrontProductRows(brandOrFilter?: string): Promise<Record<string, unknown>[]> {
   const tenant = getActiveTenant();
   const supabase = getSupabaseAdmin();
   const rows: Record<string, unknown>[] = [];
@@ -19,7 +23,7 @@ async function fetchActiveProductRows(brandOrFilter?: string): Promise<Record<st
     let query = supabase
       .from("products")
       .select("*")
-      .eq("active", true)
+      .eq("assortment_status", "active")
       .eq("organization_id", tenant.organizationId)
       .order("created_at", { ascending: false })
       .range(from, from + CATALOG_PAGE_SIZE - 1);
@@ -51,7 +55,7 @@ function brandOrFilter(brand: BrandConfig): string {
 function mapCatalogRows(rows: Record<string, unknown>[]): Product[] {
   return rows
     .map(mapProduct)
-    .filter((p) => p.is_listing_product !== false)
+    .filter(isStorefrontEligible)
     .sort((a, b) => {
       const aOut = getSellableStock(a) <= 0 ? 1 : 0;
       const bOut = getSellableStock(b) <= 0 ? 1 : 0;
@@ -59,15 +63,15 @@ function mapCatalogRows(rows: Record<string, unknown>[]): Product[] {
     });
 }
 
-/** Active catalog products for the current tenant, sold-out last. */
+/** Assortment-active catalog products for the current tenant, sold-out last. */
 export async function fetchCatalogProducts(): Promise<Product[]> {
-  return mapCatalogRows(await fetchActiveProductRows());
+  return mapCatalogRows(await fetchStorefrontProductRows());
 }
 
 export async function fetchBrandProducts(brand: BrandConfig): Promise<Product[]> {
   const orFilter = brandOrFilter(brand);
   if (!orFilter) return [];
 
-  const rows = await fetchActiveProductRows(orFilter);
+  const rows = await fetchStorefrontProductRows(orFilter);
   return mapCatalogRows(rows).filter((p) => productBelongsToBrand(p.brand, brand));
 }

@@ -11,7 +11,25 @@ export type JoybuyErrorCode =
   | "JOYBUY_NOT_IMPLEMENTED"
   | "JOYBUY_INVALID_CONFIG"
   | "JOYBUY_MAPPING_ERROR"
-  | "JOYBUY_SYNC_BLOCKED";
+  | "JOYBUY_SYNC_BLOCKED"
+  | "JOYBUY_API_ERROR"
+  | "JOYBUY_HTTP_ERROR";
+
+/** Documented Joybuy Open Platform envelope. */
+export type JoybuyApiErrorItem = {
+  code: string;
+  message: string;
+  details?: string | null;
+};
+
+export type JoybuyApiEnvelope<T = unknown> = {
+  success: boolean;
+  data?: T;
+  errorList?: JoybuyApiErrorItem[];
+  /** Optional request correlation id when Joybuy returns one. */
+  requestId?: string | null;
+  traceId?: string | null;
+};
 
 export type JoybuyResult<T = void> =
   | { success: true; data: T }

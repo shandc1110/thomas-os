@@ -12,19 +12,34 @@ import {
 import type { Product } from "@/lib/types";
 import { getClientTenant } from "@/lib/thomas/tenant/resolve";
 import { getSellableStock } from "@/lib/presell";
+import {
+  displayUnitPriceForCartLine,
+  type OrderPricingChannel,
+} from "@/lib/storefront/order-pricing";
 
 export type CartItem = {
   product: Product;
   quantity: number;
+  /**
+   * Which commercial price the line was added under.
+   * Display-only hint — POST /api/orders re-resolves from the DB.
+   */
+  pricingChannel?: OrderPricingChannel;
 };
 
 type CartContextValue = {
   items: CartItem[];
   totalItems: number;
   totalPrice: number;
+  /** True when every line was added under the UK Shopify channel. */
+  isShopifyCart: boolean;
   hydrated: boolean;
   getQuantity: (productId: Product["id"]) => number;
-  addItem: (product: Product, quantity?: number) => void;
+  addItem: (
+    product: Product,
+    quantity?: number,
+    pricingChannel?: OrderPricingChannel,
+  ) => void;
   setQuantity: (productId: Product["id"], quantity: number) => void;
   removeItem: (productId: Product["id"]) => void;
   clear: () => void;
@@ -41,6 +56,17 @@ function clampToStock(quantity: number, product: Product): number {
   return quantity;
 }
 
+function normaliseStoredItem(raw: unknown): CartItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const entry = raw as CartItem;
+  if (!entry.product || !(entry.quantity > 0)) return null;
+  const pricingChannel =
+    entry.pricingChannel === "shopify" ? "shopify" : entry.pricingChannel === "community"
+      ? "community"
+      : undefined;
+  return { product: entry.product, quantity: entry.quantity, pricingChannel };
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -49,9 +75,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as CartItem[];
+        const parsed = JSON.parse(raw) as unknown;
         if (Array.isArray(parsed)) {
-          setItems(parsed.filter((item) => item?.product && item.quantity > 0));
+          setItems(
+            parsed
+              .map(normaliseStoredItem)
+              .filter((item): item is CartItem => item != null),
+          );
         }
       }
     } catch {
@@ -78,25 +108,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [items],
   );
 
-  const addItem = useCallback((product: Product, quantity = 1) => {
-    setItems((prev) => {
-      const key = String(product.id);
-      const existing = prev.find((item) => String(item.product.id) === key);
-      if (existing) {
-        return prev.map((item) =>
-          String(item.product.id) === key
-            ? {
-                product,
-                quantity: clampToStock(item.quantity + quantity, product),
-              }
-            : item,
-        );
-      }
-      const next = clampToStock(quantity, product);
-      if (next <= 0) return prev;
-      return [...prev, { product, quantity: next }];
-    });
-  }, []);
+  const addItem = useCallback(
+    (product: Product, quantity = 1, pricingChannel?: OrderPricingChannel) => {
+      setItems((prev) => {
+        const key = String(product.id);
+        const channel = pricingChannel ?? "community";
+        const existing = prev.find((item) => String(item.product.id) === key);
+        if (existing) {
+          return prev.map((item) =>
+            String(item.product.id) === key
+              ? {
+                  product,
+                  quantity: clampToStock(item.quantity + quantity, product),
+                  pricingChannel: channel,
+                }
+              : item,
+          );
+        }
+        const next = clampToStock(quantity, product);
+        if (next <= 0) return prev;
+        return [...prev, { product, quantity: next, pricingChannel: channel }];
+      });
+    },
+    [],
+  );
 
   const setQuantity = useCallback((productId: Product["id"], quantity: number) => {
     setItems((prev) => {
@@ -104,7 +139,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return prev
         .map((item) =>
           String(item.product.id) === key
-            ? { product: item.product, quantity: clampToStock(quantity, item.product) }
+            ? {
+                product: item.product,
+                quantity: clampToStock(quantity, item.product),
+                pricingChannel: item.pricingChannel,
+              }
             : item,
         )
         .filter((item) => item.quantity > 0);
@@ -117,21 +156,30 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => setItems([]), []);
 
+  const isShopifyCart =
+    items.length > 0 && items.every((item) => item.pricingChannel === "shopify");
+
   const { totalItems, totalPrice } = useMemo(() => {
     let count = 0;
     let price = 0;
     for (const item of items) {
       count += item.quantity;
-      price += (item.product.price ?? 0) * item.quantity;
+      const { unitPrice } = displayUnitPriceForCartLine(
+        item.product,
+        item.pricingChannel,
+        isShopifyCart ? "GBP" : "CNY",
+      );
+      price += unitPrice * item.quantity;
     }
     return { totalItems: count, totalPrice: price };
-  }, [items]);
+  }, [items, isShopifyCart]);
 
   const value = useMemo<CartContextValue>(
     () => ({
       items,
       totalItems,
       totalPrice,
+      isShopifyCart,
       hydrated,
       getQuantity,
       addItem,
@@ -139,7 +187,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       clear,
     }),
-    [items, totalItems, totalPrice, hydrated, getQuantity, addItem, setQuantity, removeItem, clear],
+    [
+      items,
+      totalItems,
+      totalPrice,
+      isShopifyCart,
+      hydrated,
+      getQuantity,
+      addItem,
+      setQuantity,
+      removeItem,
+      clear,
+    ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

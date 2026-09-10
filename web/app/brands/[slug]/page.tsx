@@ -64,9 +64,9 @@ export default async function BrandPage({ params }: PageProps) {
   const otherBrands = getActiveBrands().filter((b) => b.slug !== brand.slug);
 
   return (
-    <div className="relative min-h-full w-full">
+    <div className="relative min-h-screen w-full bg-storefront">
       <ShopHeader compact />
-      <main className="relative mx-auto w-full max-w-6xl px-4 pb-8 pt-8">
+      <main className="relative mx-auto w-full max-w-6xl px-4 pb-8 pt-8 sm:px-6 lg:px-10">
         <BrandHero brand={brand} productCount={products.length} />
         <BrandCatalog
           products={products}

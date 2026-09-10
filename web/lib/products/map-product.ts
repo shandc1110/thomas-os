@@ -25,6 +25,7 @@ export function mapProduct(row: Record<string, unknown>): Product {
     price: row.price != null ? Number(row.price) : null,
     retail_price: row.retail_price != null ? Number(row.retail_price) : null,
     shopify_price: row.shopify_price != null ? Number(row.shopify_price) : null,
+    joybuy_price: row.joybuy_price != null ? Number(row.joybuy_price) : null,
     cost_price: row.cost_price != null ? Number(row.cost_price) : null,
     currency: (row.currency as string | null) ?? "CNY",
     image_url: (row.image_url as string | null) ?? null,
@@ -54,6 +55,7 @@ export function mapProduct(row: Record<string, unknown>): Product {
     length_mm: (row.length_mm as number | null) ?? null,
     width_mm: (row.width_mm as number | null) ?? null,
     height_mm: (row.height_mm as number | null) ?? null,
+    tags,
     created_at: (row.created_at as string | null) ?? null,
     updated_at: (row.updated_at as string | null) ?? null,
   };

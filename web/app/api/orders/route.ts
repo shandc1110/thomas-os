@@ -10,7 +10,10 @@ import {
 import { getDefaultWarehouseLocation } from "@/lib/warehouse/warehouses";
 import { computeTotalWeightGrams } from "@/lib/weight";
 import { getSellableStock, getOnHandStock } from "@/lib/presell";
-import { unitPriceForOrder } from "@/lib/currency";
+import {
+  normaliseOrderPricingChannel,
+  resolveAuthoritativeUnitPrice,
+} from "@/lib/storefront/order-pricing";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
 import { isStripeConfigured } from "@/lib/stripe/client";
 import { amountGbpForStripe, createStripeCheckoutSession } from "@/lib/stripe/checkout";
@@ -31,6 +34,8 @@ type ProductRow = {
   name: string;
   price: number | null;
   currency: string | null;
+  shopify_price: number | null;
+  joybuy_price: number | null;
   stock: number | null;
   presell_enabled: boolean | null;
   presell_quantity: number | null;
@@ -159,6 +164,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   const currencyRaw = customer?.currency?.trim().toUpperCase();
   const currency = currencyRaw === "GBP" ? "GBP" : "CNY";
   const notes = customer?.notes?.trim() || null;
+  const pricingChannel = normaliseOrderPricingChannel(body?.pricing_channel);
 
   if (!firstName) return badRequest("First name is required.");
   if (!lastName) return badRequest("Last name is required.");
@@ -169,6 +175,10 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   if (!address) return badRequest("Delivery address is required.");
   if (!postcode) return badRequest("Postcode is required.");
   if (!paymentMethod) return badRequest("Please choose a payment method.");
+
+  if (pricingChannel === "shopify" && currency !== "GBP") {
+    return badRequest("UK Shopify orders must use GBP.");
+  }
 
   const customerName = `${firstName} ${lastName}`;
 
@@ -188,7 +198,9 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   const ids = items.map((item) => item.product_id);
   const { data: productRows, error: fetchError } = await supabase
     .from("products")
-    .select("id, name, price, currency, stock, presell_enabled, presell_quantity, expected_arrival_month, active, weight_grams")
+    .select(
+      "id, name, price, currency, shopify_price, joybuy_price, stock, presell_enabled, presell_quantity, expected_arrival_month, active, weight_grams",
+    )
     .in("id", ids);
 
   if (fetchError) {
@@ -231,6 +243,16 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
       { success: false, error: "Some items are no longer available in the requested quantity.", issues },
       { status: 409 },
     );
+  }
+
+  const unitPriceByProductId = new Map<string, number>();
+  for (const item of items) {
+    const product = productMap.get(String(item.product_id))!;
+    const resolved = resolveAuthoritativeUnitPrice(product, pricingChannel, currency);
+    if ("error" in resolved) {
+      return badRequest(resolved.error);
+    }
+    unitPriceByProductId.set(String(item.product_id), resolved.unitPrice);
   }
 
   // Allocate order number early so stock movements can reference it.
@@ -287,11 +309,8 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   }
 
   const total = items.reduce((sum, item) => {
-    const product = productMap.get(String(item.product_id));
-    return (
-      sum +
-      unitPriceForOrder(product?.price ?? 0, product?.currency, currency) * item.quantity
-    );
+    const unit = unitPriceByProductId.get(String(item.product_id)) ?? 0;
+    return sum + unit * item.quantity;
   }, 0);
 
   const totalWeightGrams = computeTotalWeightGrams(
@@ -359,12 +378,11 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   }
 
   const orderItemsPayload = items.map((item) => {
-    const product = productMap.get(String(item.product_id))!;
     return {
       order_id: orderId,
       product_id: item.product_id,
       quantity: item.quantity,
-      price: unitPriceForOrder(product.price ?? 0, product.currency, currency),
+      price: unitPriceByProductId.get(String(item.product_id)) ?? 0,
       presell_quantity: allocationMap.get(String(item.product_id)) ?? 0,
     };
   });
@@ -415,7 +433,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     try {
       const stripeLines = items.map((item) => {
         const product = productMap.get(String(item.product_id))!;
-        const unitPrice = unitPriceForOrder(product.price ?? 0, product.currency, currency);
+        const unitPrice = unitPriceByProductId.get(String(item.product_id)) ?? 0;
         return {
           name: product.name,
           quantity: item.quantity,
@@ -487,7 +505,7 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
       return {
         name: product.name,
         quantity: item.quantity,
-        price: unitPriceForOrder(product.price ?? 0, product.currency, currency),
+        price: unitPriceByProductId.get(String(item.product_id)) ?? 0,
       };
     }),
     total,

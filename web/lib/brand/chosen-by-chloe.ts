@@ -22,13 +22,21 @@ export const cbcV4Assets = {
   favicon: `${CBC_V4_ASSET_BASE}/favicon-cc.png`,
 } as const;
 
-/** Approved V4 core palette only. */
+/** Approved V4 core palette + storefront canvas. */
 export const cbcV4Colors = {
   warmIvory: "#F8F1E5",
+  /** Primary customer-facing catalogue / shop / brand / PDP canvas. */
+  storefrontCanvas: "#F3EBDD",
   charcoal: "#242321",
   sage: "#A8B19F",
   white: "#FFFFFF",
 } as const;
+
+/**
+ * Continuous storefront content surface (#F3EBDD).
+ * Literal class kept for Tailwind discovery; backed by @utility in globals.css.
+ */
+export const STOREFRONT_CANVAS_CLASS = "bg-storefront" as const;
 
 export const cbcV4Brand = {
   displayName: "CHOSEN by Chloe",
@@ -45,8 +53,8 @@ export const cbcV4Brand = {
   editSupport: "Things we've tried, loved and chosen.",
   bannerText: "CHOSEN WITH A MOTHER'S HEART · FOR LITTLE LIVES",
   nav: [
-    { href: "/#shop", label: "Shop" },
-    { href: "/#chloe-edit", label: "The Edit" },
+    { href: "/shop", label: "Shop" },
+    { href: "/edit", label: "The Edit" },
     { href: "/#our-brands", label: "Brands" },
     { href: "/#our-story", label: "Our Story" },
   ] as const,
