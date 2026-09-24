@@ -103,6 +103,32 @@ export async function fetchAllShopifyProducts(baseUrl: string): Promise<Record<s
   return all;
 }
 
+/** Fetch products from a Shopify collection (e.g. /collections/kidywolf). */
+export async function fetchShopifyCollectionProducts(
+  baseUrl: string,
+  collectionHandle: string,
+): Promise<Record<string, unknown>[]> {
+  const base = baseUrl.replace(/\/$/, "");
+  const handle = collectionHandle.replace(/^\/+|\/+$/g, "");
+  const all: Record<string, unknown>[] = [];
+
+  for (let page = 1; page <= 40; page++) {
+    const url = `${base}/collections/${handle}/products.json?limit=250&page=${page}`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+    const json = (await res.json()) as { products?: Record<string, unknown>[] };
+    const batch = json.products ?? [];
+    if (!batch.length) break;
+    all.push(...batch);
+    console.log(`  collection ${handle} page ${page}: +${batch.length} (total ${all.length})`);
+    await sleep(120);
+  }
+
+  return all;
+}
+
 export function expandProductVariants(
   config: ShopifyBrandConfig,
   products: Record<string, unknown>[],
