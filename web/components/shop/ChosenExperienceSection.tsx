@@ -31,10 +31,10 @@ export function ChosenExperienceSection() {
               {content.heading}
             </h2>
 
-            {/* Emotional centre — handwritten script (not Playfair italic) */}
+            {/* Emotional centre — simple handwritten note (Caveat; not Playfair italic) */}
             <blockquote className="mt-9 border-0 p-0 md:mt-10">
               <p
-                className={`${deerPathStatementFont.className} text-[2rem] leading-[1.12] text-charcoal sm:text-[2.25rem] lg:text-[2.75rem]`}
+                className={`${deerPathStatementFont.className} text-[1.875rem] font-normal not-italic leading-none tracking-normal text-charcoal sm:text-[2rem] md:text-[2.25rem] md:leading-[1]`}
               >
                 {content.statementLines.map((line) => (
                   <span key={line} className="block">

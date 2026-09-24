@@ -12,11 +12,13 @@ import {
 } from "@/components/shop/HomeSections";
 import { ChloeEditTransition } from "@/components/shop/ChloeEditTransition";
 import { cbcV4Assets, cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
-import { getActiveBrands } from "@/lib/brands";
+import { getStorefrontActiveBrands } from "@/lib/brands/storefront-active";
 import { fetchCatalogProducts } from "@/lib/brands/catalog";
 import { productBelongsToBrand } from "@/lib/brands/match";
 import { getChloeEditStorefrontProducts } from "@/lib/storefront/chloe-edit";
 import { getActiveTenant } from "@/lib/thomas/tenant/resolve";
+
+export const dynamic = "force-dynamic";
 
 const tenant = getActiveTenant();
 
@@ -41,7 +43,7 @@ export const metadata: Metadata = {
  * Chloe Edit homepage slice is curation-driven (max 6 by position).
  */
 export default async function Home() {
-  const brands = getActiveBrands();
+  const brands = await getStorefrontActiveBrands();
   const products = await fetchCatalogProducts();
   const brandsWithCounts = brands.map((brand) => ({
     brand,

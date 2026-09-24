@@ -6,6 +6,7 @@ import {
   upsertSupplier,
   listBrands,
   upsertBrand,
+  updateBrandContractStatus,
   getProcurementDashboard,
   listPurchaseOrders,
   createPurchaseOrder,
@@ -15,6 +16,7 @@ import {
   listShipments,
   createInboundShipment,
 } from "@/lib/purchasing/suppliers";
+import { seedStorefrontBrandsFromRegistry } from "@/lib/brands/storefront-active";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,6 +82,34 @@ export const POST = staffRoute(async ({ request, supabase }) => {
       const { brand, error } = await upsertBrand(supabase, { ...body, organization_id: orgId });
       if (error) return NextResponse.json({ success: false, error }, { status: 500 });
       return NextResponse.json({ success: true, brand });
+    }
+    case "brand-status": {
+      const id = typeof body.id === "string" ? body.id.trim() : "";
+      const status = body.contract_status === "inactive" ? "inactive" : "active";
+      if (!id) {
+        return NextResponse.json({ success: false, error: "id required." }, { status: 400 });
+      }
+      const { brand, error } = await updateBrandContractStatus(supabase, {
+        id,
+        contract_status: status,
+        organization_id: orgId,
+      });
+      if (error) return NextResponse.json({ success: false, error }, { status: 500 });
+      return NextResponse.json({ success: true, brand });
+    }
+    case "seed-storefront-brands": {
+      const result = await seedStorefrontBrandsFromRegistry();
+      if (result.error) {
+        return NextResponse.json({ success: false, error: result.error }, { status: 500 });
+      }
+      const { brands, error } = await listBrands(supabase, orgId);
+      if (error) return NextResponse.json({ success: false, error }, { status: 500 });
+      return NextResponse.json({
+        success: true,
+        inserted: result.inserted,
+        skipped: result.skipped,
+        brands,
+      });
     }
     case "purchase-order": {
       const { po, error } = await createPurchaseOrder(supabase, { ...body, organization_id: orgId });

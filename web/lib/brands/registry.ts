@@ -1,8 +1,9 @@
 import type { BrandConfig } from "./types";
 
 /**
- * Storefront brand registry — single source of truth for brand pages & nav.
- * Adding a brand: append a config, set `active: true`, associate products via `matchNames`.
+ * Storefront brand registry — presentation + matchNames.
+ * Live visibility is overridden by purchasing brands.contract_status when a DB row
+ * matches (see storefront-active.ts). registry.active is the fallback when no DB row.
  */
 export const BRAND_REGISTRY: BrandConfig[] = [
   {

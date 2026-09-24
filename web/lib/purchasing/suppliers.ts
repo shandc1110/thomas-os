@@ -51,13 +51,27 @@ export async function listBrands(
 
 export async function upsertBrand(
   supabase: SupabaseClient,
-  input: Partial<Brand> & { name: string },
+  input: Partial<Brand> & { name: string; organization_id?: string },
 ): Promise<{ brand: Brand | null; error: string | null }> {
   const { data, error } = await supabase
     .from("brands")
     .upsert(input, { onConflict: "name" })
     .select()
     .single();
+  if (error) return { brand: null, error: error.message };
+  return { brand: data as Brand, error: null };
+}
+
+export async function updateBrandContractStatus(
+  supabase: SupabaseClient,
+  input: { id: string; contract_status: "active" | "inactive"; organization_id?: string },
+): Promise<{ brand: Brand | null; error: string | null }> {
+  let query = supabase
+    .from("brands")
+    .update({ contract_status: input.contract_status })
+    .eq("id", input.id);
+  if (input.organization_id) query = query.eq("organization_id", input.organization_id);
+  const { data, error } = await query.select().single();
   if (error) return { brand: null, error: error.message };
   return { brand: data as Brand, error: null };
 }

@@ -3,7 +3,8 @@
  * Eligibility: assortment_status = 'active' (never products.active alone).
  */
 import { NextResponse } from "next/server";
-import { brandSlugFromProductBrand, getBrandBySlug } from "@/lib/brands";
+import { brandSlugFromProductBrand } from "@/lib/brands";
+import { resolveStorefrontBrandBySlug } from "@/lib/brands/storefront-active";
 import { getStorefrontProducts } from "@/lib/storefront";
 
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const brandSlug = new URL(request.url).searchParams.get("brand")?.trim().toLowerCase();
 
   if (brandSlug) {
-    const brand = getBrandBySlug(brandSlug);
+    const brand = await resolveStorefrontBrandBySlug(brandSlug);
     if (!brand || !brand.active) {
       return NextResponse.json({ success: false, error: "Unknown brand." }, { status: 404 });
     }

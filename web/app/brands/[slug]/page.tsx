@@ -6,11 +6,13 @@ import { BrandHero } from "@/components/brands/BrandHero";
 import { ShopFooter } from "@/components/shop/ShopFooter";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import {
-  getActiveBrands,
   getAllBrandSlugs,
-  getBrandBySlug,
 } from "@/lib/brands";
 import { fetchBrandProducts } from "@/lib/brands/catalog";
+import {
+  getStorefrontActiveBrands,
+  resolveStorefrontBrandBySlug,
+} from "@/lib/brands/storefront-active";
 import { cbcV4Brand } from "@/lib/brand/chosen-by-chloe";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +35,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const brand = getBrandBySlug(slug);
+  const brand = await resolveStorefrontBrandBySlug(slug);
   if (!brand || !brand.active) {
     return { title: `Brand not found | ${cbcV4Brand.displayName}` };
   }
@@ -54,14 +56,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BrandPage({ params }: PageProps) {
   const { slug } = await params;
-  const brand = getBrandBySlug(slug);
+  const brand = await resolveStorefrontBrandBySlug(slug);
 
   if (!brand || !brand.active) {
     notFound();
   }
 
   const products = await fetchBrandProducts(brand);
-  const otherBrands = getActiveBrands().filter((b) => b.slug !== brand.slug);
+  const otherBrands = (await getStorefrontActiveBrands()).filter((b) => b.slug !== brand.slug);
 
   return (
     <div className="relative min-h-screen w-full bg-storefront">

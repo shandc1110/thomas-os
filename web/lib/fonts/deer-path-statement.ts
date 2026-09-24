@@ -1,15 +1,12 @@
-import { Mrs_Saint_Delafield } from "next/font/google";
+import { Caveat } from "next/font/google";
 
 /**
- * Section-scoped script for the Deer Path emotional statement only.
- * Inspired by the handwritten “Chloe” lettering in the V4 wordmark
- * (raster logo — not available as a font file).
- *
- * Mrs Saint Delafield: fine pointed-pen calligraphy — elegant, personal,
- * not wedding-heavy or brushy.
+ * Section-scoped handwritten font for the Deer Path emotional statement only.
+ * Caveat: simple natural handwriting — warm and relaxed, not formal calligraphy.
  */
-export const deerPathStatementFont = Mrs_Saint_Delafield({
+export const deerPathStatementFont = Caveat({
   weight: "400",
   subsets: ["latin"],
   display: "swap",
+  style: "normal",
 });
