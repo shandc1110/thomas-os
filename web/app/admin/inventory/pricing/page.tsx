@@ -14,6 +14,7 @@ type Draft = {
   cost_price: string;
   price: string;
   shopify_price: string;
+  joybuy_price: string;
 };
 
 function toDraft(product: ProductMaster): Draft {
@@ -21,6 +22,7 @@ function toDraft(product: ProductMaster): Draft {
     cost_price: product.cost_price != null ? String(product.cost_price) : "",
     price: product.price != null ? String(product.price) : "",
     shopify_price: product.shopify_price != null ? String(product.shopify_price) : "",
+    joybuy_price: product.joybuy_price != null ? String(product.joybuy_price) : "",
   };
 }
 
@@ -126,6 +128,7 @@ export default function PricingPage() {
         price: consolePrice,
         retail_price: consolePrice,
         shopify_price: parseAmount(draft.shopify_price),
+        joybuy_price: parseAmount(draft.joybuy_price),
       }),
     });
     const result = await response.json();
@@ -176,12 +179,13 @@ export default function PricingPage() {
       <div>
         <h2 className="font-serif text-2xl text-espresso">Pricing</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          Console price (this portal):{" "}
-          <span className="font-medium text-espresso">
-            supplier cost × 1.25 + weight(kg) × 14 × 1.25, rounded up to nearest 9
-          </span>
-          . Checkout GBP uses ¥{rate} × {markup}. Shopify price is set manually — never overwritten by
-          the formula.
+          <span className="font-medium text-espresso">Community / source</span> uses{" "}
+          <code className="text-xs">products.price</code> + currency (Mideer: CNY).{" "}
+          <span className="font-medium text-espresso">Shopify UK</span> and{" "}
+          <span className="font-medium text-espresso">Joybuy UK</span> are explicit GBP
+          channel prices — never FX of community price. Portal checkout still converts
+          community CNY with ¥{rate} × {markup} for draft orders; that is separate from
+          storefront GBP.
         </p>
       </div>
 
@@ -241,9 +245,10 @@ export default function PricingPage() {
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Arrival</th>
                 <th className="px-4 py-3">Supplier cost</th>
-                <th className="px-4 py-3">Console price</th>
-                <th className="px-4 py-3">Checkout GBP</th>
-                <th className="px-4 py-3">Shopify (manual)</th>
+                <th className="px-4 py-3">Community / source</th>
+                <th className="px-4 py-3">Portal FX preview</th>
+                <th className="px-4 py-3">Shopify UK (GBP)</th>
+                <th className="px-4 py-3">Joybuy UK (GBP)</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -306,7 +311,18 @@ export default function PricingPage() {
                         step="0.01"
                         value={draft.shopify_price}
                         onChange={(e) => updateDraft(id, "shopify_price", e.target.value)}
-                        placeholder="Manual"
+                        placeholder="GBP"
+                        className="w-28 rounded-xl border border-sand px-3 py-2"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={draft.joybuy_price}
+                        onChange={(e) => updateDraft(id, "joybuy_price", e.target.value)}
+                        placeholder="GBP"
                         className="w-28 rounded-xl border border-sand px-3 py-2"
                       />
                     </td>

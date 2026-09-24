@@ -12,6 +12,7 @@ import {
 } from "@/lib/presell";
 import { formatPrice } from "@/lib/format";
 import { productUrl } from "@/lib/products/slug";
+import { resolveStorefrontImageUrl } from "@/lib/products/storefront-image";
 import { listingSellableStock, minVariantPrice, productHasVariants } from "@/lib/products/variants";
 import { useCart } from "@/context/CartContext";
 
@@ -62,18 +63,20 @@ export default function ProductCard({ product, variants = [] }: ProductCardProps
 
   function handleAdd() {
     if (!canAdd) return;
-    addItem(product, clampedSelected);
+    addItem(product, clampedSelected, "community");
     setSelected(1);
   }
 
+  const presentationImage = resolveStorefrontImageUrl(product.image_url);
+
   const imageBlock = (
-    <div className="relative aspect-square w-full overflow-hidden bg-white">
-      {product.image_url ? (
+    <div className="relative aspect-square w-full overflow-hidden bg-transparent">
+      {presentationImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={product.image_url}
+          src={presentationImage}
           alt={product.name}
-          className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.02] ${
+          className={`h-full w-full object-contain object-center ${
             soldOut ? "opacity-50" : ""
           }`}
           loading="lazy"
@@ -162,7 +165,7 @@ export default function ProductCard({ product, variants = [] }: ProductCardProps
         </button>
       ) : (
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between border border-sand bg-white p-1">
+          <div className="flex items-center justify-between border border-sand bg-transparent p-1">
             <button
               type="button"
               onClick={decrement}

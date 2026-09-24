@@ -1,33 +1,64 @@
 import "server-only";
 import { getJoybuyConfig, type JoybuyConfig } from "./config";
-import { JoybuyApiNotImplementedError } from "./errors";
+import { JoybuyNotConfiguredError } from "./errors";
+import {
+  createJoybuySignature,
+  type CreateJoybuySignatureInput,
+  type JoybuySignatureResult,
+  type JoybuySignMethod,
+} from "./sign";
+
+export type {
+  CreateJoybuySignatureInput,
+  JoybuySignatureResult,
+  JoybuySignMethod,
+} from "./sign";
+
+export {
+  buildJoybuySignParameters,
+  concatenateJoybuySignParameters,
+  createJoybuySignature,
+  serializeJoybuyBody,
+} from "./sign";
 
 /**
- * Authentication adapter placeholder.
- *
- * Official Joybuy signing / OAuth parameters are NOT implemented here.
- * Wire the verified protocol from Joybuy Open Platform docs into this module only.
+ * Validates Joybuy credentials are present and returns the configured access token.
+ * Token refresh / OAuth exchange is not part of the SP-API signing spec and is not invented here.
  */
 export async function authenticateJoybuy(
   _config?: JoybuyConfig,
 ): Promise<{ accessToken: string }> {
   const config = _config ?? getJoybuyConfig();
-  void config;
-  throw new JoybuyApiNotImplementedError(
-    "Joybuy authenticate() is not implemented until the official auth flow is confirmed.",
-  );
+  if (!config.accessToken) {
+    throw new JoybuyNotConfiguredError(
+      "Joybuy access token is missing. Set JOYBUY_ACCESS_TOKEN after app approval.",
+    );
+  }
+  return { accessToken: config.accessToken };
 }
 
-/**
- * Returns a bearer-style token placeholder for future HTTP calls.
- * Does not invent signing algorithms.
- */
+/** Returns the server-side access token from config (never log this value). */
 export async function getJoybuyAccessToken(): Promise<string> {
-  const config = getJoybuyConfig();
-  // When official refresh/signing exists, replace this path.
-  // For now credentials presence is validated but live auth is not implemented.
-  void config.accessToken;
-  throw new JoybuyApiNotImplementedError(
-    "Joybuy access-token resolution is not implemented until the official auth flow is confirmed.",
-  );
+  const { accessToken } = await authenticateJoybuy();
+  return accessToken;
+}
+
+/** Convenience wrapper around createJoybuySignature using current config secrets. */
+export function signJoybuyRequest(
+  input: Omit<CreateJoybuySignatureInput, "appKey" | "appSecret" | "signMethod"> & {
+    signMethod?: JoybuySignMethod;
+    config?: JoybuyConfig;
+  },
+): JoybuySignatureResult {
+  const config = input.config ?? getJoybuyConfig();
+  return createJoybuySignature({
+    appKey: config.appKey,
+    appSecret: config.appSecret,
+    accessToken: input.accessToken,
+    timestamp: input.timestamp,
+    pathParams: input.pathParams,
+    queryParams: input.queryParams,
+    body: input.body,
+    signMethod: input.signMethod ?? config.signMethod,
+  });
 }

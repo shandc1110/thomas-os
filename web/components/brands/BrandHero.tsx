@@ -7,7 +7,7 @@ type BrandHeroProps = {
 
 export function BrandHero({ brand, productCount }: BrandHeroProps) {
   return (
-    <section className="mb-10 border-b border-sand/80 pb-10">
+    <section className="mb-10 pb-10">
       <div className="mx-auto max-w-2xl px-1 text-center">
         {brand.logoUrl ? (
           <div

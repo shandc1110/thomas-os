@@ -171,6 +171,14 @@ export default function AdminOrdersPage() {
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-muted">Fulfilment</p>
           <h1 className="font-serif text-3xl text-espresso">Orders</h1>
+          <p className="mt-2">
+            <Link
+              href="/admin/orders/consolidations"
+              className="text-sm font-semibold text-cocoa hover:underline"
+            >
+              Order consolidations & invoices →
+            </Link>
+          </p>
         </div>
         <Link href="/" className="text-sm font-medium text-clay hover:text-cocoa">
           Shop &rarr;

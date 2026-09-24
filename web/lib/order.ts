@@ -21,6 +21,12 @@ export type OrderCustomer = {
 export type CreateOrderRequest = {
   customer: OrderCustomer;
   items: OrderItemInput[];
+  /**
+   * Which commercial price book to settle against.
+   * Server resolves prices from the DB — never trusts client money fields.
+   * Default: community (Order Portal).
+   */
+  pricing_channel?: "community" | "shopify";
 };
 
 export type StockIssue = {

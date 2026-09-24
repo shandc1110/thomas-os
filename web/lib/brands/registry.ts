@@ -97,6 +97,24 @@ export const BRAND_REGISTRY: BrandConfig[] = [
     active: true,
     defaultCurrency: "GBP",
   },
+  {
+    slug: "kidywolf",
+    name: "Kidywolf",
+    matchNames: ["kidywolf", "kidy wolf"],
+    tagline: "Creative tech toys for curious kids",
+    description:
+      "Shop Kidywolf at UK RRP — drawing tablets, cameras, karaoke, walkie-talkies and exploration toys that spark creativity and learning. Pre-order incoming stock.",
+    logoUrl: "/brands/kidywolf.png",
+    logoWidthClass: "max-w-[min(92vw,280px)]",
+    logoImageClass: "h-16 w-full object-contain sm:h-20",
+    logoCardClass: "max-h-20 w-full max-w-[min(100%,220px)] object-contain",
+    heroAccent: "#2f6f6a",
+    metaTitle: "Kidywolf | Chosen by Chloe",
+    metaDescription:
+      "Kidywolf toys curated by Chosen by Chloe — creative tech, cameras, karaoke and exploration play at UK RRP.",
+    active: true,
+    defaultCurrency: "GBP",
+  },
 ];
 
 export function getActiveBrands(): BrandConfig[] {

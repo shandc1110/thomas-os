@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { staffRoute } from "@/lib/thomas/api/staff-route";
-import { getProductById, updateProductPresell, updateProductPricing, updateProductShipping } from "@/lib/inventory/products";
+import { getOrganizationId } from "@/lib/thomas/tenant/scope";
+import {
+  getProductById,
+  updateProductPresell,
+  updateProductPricing,
+  updateProductShipping,
+} from "@/lib/inventory/products";
 import { getProductBalances, getProductLedger } from "@/lib/inventory/movements";
+import { updateActiveProductEnrichment } from "@/lib/storefront/enrichment-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +56,7 @@ export const PATCH = staffRoute<{ id: string }>(async ({ request, supabase, para
       price?: number | null;
       retail_price?: number | null;
       shopify_price?: number | null;
+      joybuy_price?: number | null;
     } = {};
 
     if ("cost_price" in body) {
@@ -62,6 +70,9 @@ export const PATCH = staffRoute<{ id: string }>(async ({ request, supabase, para
     }
     if ("shopify_price" in body) {
       payload.shopify_price = body.shopify_price != null ? Number(body.shopify_price) : null;
+    }
+    if ("joybuy_price" in body) {
+      payload.joybuy_price = body.joybuy_price != null ? Number(body.joybuy_price) : null;
     }
 
     const { product, error } = await updateProductPricing(supabase, params.id, payload);
@@ -86,6 +97,30 @@ export const PATCH = staffRoute<{ id: string }>(async ({ request, supabase, para
 
     if (error) return NextResponse.json({ success: false, error }, { status: 500 });
     return NextResponse.json({ success: true, product });
+  }
+
+  /** Lightweight storefront enrichment — category + description, active assortment only. */
+  if (body.action === "storefront_enrichment") {
+    const result = await updateActiveProductEnrichment(supabase, {
+      productId: params.id,
+      organizationId: getOrganizationId(),
+      category: body.category,
+      description: body.description,
+    });
+
+    if (result.error || !result.row) {
+      return NextResponse.json(
+        { success: false, error: result.error ?? "Update failed." },
+        { status: result.status || 500 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      product: result.row,
+      storefront: result.storefront,
+      updatedFields: result.updatedFields,
+    });
   }
 
   return NextResponse.json({ success: false, error: "Unknown action." }, { status: 400 });

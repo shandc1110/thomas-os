@@ -232,6 +232,7 @@ export async function upsertProduct(
     retail_price: input.retail_price ?? input.price ?? null,
     price: input.retail_price ?? input.price ?? null,
     shopify_price: input.shopify_price ?? null,
+    joybuy_price: input.joybuy_price ?? null,
     currency: input.currency ?? "CNY",
     status: input.status ?? "active",
     active: input.status !== "discontinued" && input.active !== false,
@@ -288,6 +289,7 @@ export async function updateProductPricing(
     price?: number | null;
     retail_price?: number | null;
     shopify_price?: number | null;
+    joybuy_price?: number | null;
   },
 ): Promise<{ product: ProductMaster | null; error: string | null }> {
   const payload: Record<string, unknown> = {
@@ -305,6 +307,9 @@ export async function updateProductPricing(
   }
   if ("shopify_price" in input) {
     payload.shopify_price = input.shopify_price ?? null;
+  }
+  if ("joybuy_price" in input) {
+    payload.joybuy_price = input.joybuy_price ?? null;
   }
 
   const { data, error } = await supabase
@@ -365,6 +370,7 @@ function mapProductRow(row: Record<string, unknown>): ProductMaster {
     retail_price: row.retail_price != null ? Number(row.retail_price) : null,
     price: row.price != null ? Number(row.price) : null,
     shopify_price: row.shopify_price != null ? Number(row.shopify_price) : null,
+    joybuy_price: row.joybuy_price != null ? Number(row.joybuy_price) : null,
     currency: (row.currency as string | null) ?? "CNY",
     status: (row.status as ProductMaster["status"]) ?? "active",
     active: (row.active as boolean | null) ?? true,

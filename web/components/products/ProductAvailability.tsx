@@ -11,6 +11,7 @@ type ProductAvailabilityProps = {
   product: Product;
 };
 
+/** Restrained PDP availability — In stock / Pre-order / Out of stock. */
 export function ProductAvailability({ product }: ProductAvailabilityProps) {
   const onHand = getOnHandStock(product);
   const presellStock = getPresellStock(product);
@@ -20,21 +21,23 @@ export function ProductAvailability({ product }: ProductAvailabilityProps) {
   const arrivalLabel = formatExpectedArrival(product.expected_arrival_month);
 
   if (soldOut) {
-    return (
-      <p className="text-sm text-muted">Currently unavailable.</p>
-    );
+    return <p className="text-sm text-muted">Out of stock</p>;
   }
 
   return (
     <div className="space-y-1 text-sm text-muted">
-      {presellOnly && arrivalLabel ? (
-        <p>Pre-order · ships {arrivalLabel}</p>
-      ) : null}
+      {presellOnly ? (
+        <p>{arrivalLabel ? `Pre-order · ships ${arrivalLabel}` : "Pre-order"}</p>
+      ) : (
+        <p>In stock</p>
+      )}
       {!presellOnly && onHand > 0 && onHand <= 3 ? (
-        <p>Only {onHand} left in stock</p>
+        <p>Only {onHand} left</p>
       ) : null}
       {!presellOnly && presellStock > 0 && arrivalLabel ? (
-        <p>+{presellStock} incoming ({arrivalLabel})</p>
+        <p>
+          +{presellStock} incoming ({arrivalLabel})
+        </p>
       ) : null}
     </div>
   );

@@ -73,7 +73,9 @@ function buildDraftOrderNote(order: OrderWithItems): string {
     `Portal currency: ${orderCurrency}`,
   ];
   if (orderCurrency === "CNY") {
-    lines.push("Shopify draft priced in GBP (converted from CNY).");
+    lines.push("Shopify draft priced in GBP (converted from community CNY).");
+  } else {
+    lines.push("Shopify draft priced in GBP (portal order currency).");
   }
   if (order.notes) {
     lines.push(`Customer notes: ${order.notes}`);

@@ -343,8 +343,9 @@ export default function ProductDetailPage({ params }: PageProps) {
           ["On hand", totalAvailable],
           ["Pre-sell", product.presell_enabled ? product.presell_quantity ?? 0 : 0],
           ["Cost", formatOrderPrice(product.cost_price, product.currency)],
-          ["Console", formatOrderPrice(product.price ?? product.retail_price, product.currency)],
-          ["Shopify", formatOrderPrice(product.shopify_price, product.currency)],
+          ["Community / source", formatOrderPrice(product.price ?? product.retail_price, product.currency)],
+          ["Shopify UK (GBP)", formatOrderPrice(product.shopify_price, "GBP")],
+          ["Joybuy UK (GBP)", formatOrderPrice(product.joybuy_price, "GBP")],
           ["Weight", product.weight_grams ? `${product.weight_grams} g` : "—"],
           [
             "Size",

@@ -63,7 +63,7 @@ export default async function ProductPage({ params }: PageProps) {
   }
 
   return (
-    <div className="relative min-h-full w-full">
+    <div className="relative min-h-screen w-full bg-storefront">
       <ShopHeader compact />
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
         <ProductPageContent product={product} variants={variants} />

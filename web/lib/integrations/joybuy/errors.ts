@@ -1,4 +1,4 @@
-import type { JoybuyErrorCode } from "./types";
+import type { JoybuyApiErrorItem, JoybuyErrorCode } from "./types";
 
 export class JoybuyError extends Error {
   readonly code: JoybuyErrorCode;
@@ -23,6 +23,35 @@ export class JoybuyApiNotImplementedError extends JoybuyError {
   ) {
     super("JOYBUY_NOT_IMPLEMENTED", message);
     this.name = "JoybuyApiNotImplementedError";
+  }
+}
+
+/**
+ * Typed Joybuy API / HTTP failure.
+ * Never include appSecret, accessToken, or signature material in message/details.
+ */
+export class JoybuyApiError extends JoybuyError {
+  readonly httpStatus: number;
+  readonly joybuyCode: string | null;
+  readonly details: string | null;
+  readonly requestId: string | null;
+  readonly errorList: JoybuyApiErrorItem[];
+
+  constructor(input: {
+    message: string;
+    httpStatus: number;
+    joybuyCode?: string | null;
+    details?: string | null;
+    requestId?: string | null;
+    errorList?: JoybuyApiErrorItem[];
+  }) {
+    super("JOYBUY_API_ERROR", input.message);
+    this.name = "JoybuyApiError";
+    this.httpStatus = input.httpStatus;
+    this.joybuyCode = input.joybuyCode ?? null;
+    this.details = input.details ?? null;
+    this.requestId = input.requestId ?? null;
+    this.errorList = input.errorList ?? [];
   }
 }
 

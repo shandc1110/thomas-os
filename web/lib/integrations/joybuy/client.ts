@@ -1,6 +1,9 @@
 import "server-only";
+import { authenticateJoybuy } from "./auth";
 import { getJoybuyConfig, isJoybuyConfigured } from "./config";
 import { JoybuyApiNotImplementedError, JoybuyNotConfiguredError } from "./errors";
+import { joybuyRequest, type JoybuyHttpRequestOptions, type JoybuyHttpResponse } from "./http";
+import { joybuyLog } from "./log";
 import type {
   JoybuyMappedInventory,
   JoybuyMappedPrice,
@@ -8,16 +11,18 @@ import type {
   JoybuyOrder,
   JoybuyShipment,
 } from "./types";
-import { joybuyLog } from "./log";
 
 /**
- * Server-side Joybuy client abstraction.
+ * Server-side Joybuy client.
  *
- * Methods enforce configuration checks then throw JoybuyApiNotImplementedError.
- * Do NOT invent endpoint paths or fake successful responses.
+ * Auth + signed HTTP transport are implemented.
+ * Domain product/order endpoint paths remain not-implemented until official
+ * path contracts are wired (do not invent URLs).
  */
 export type JoybuyClient = {
   authenticate: () => Promise<void>;
+  /** Low-level signed request helper for verified official paths. */
+  request: <T = unknown>(options: JoybuyHttpRequestOptions) => Promise<JoybuyHttpResponse<T>>;
   getProduct: (externalProductId: string) => Promise<unknown>;
   createProduct: (payload: JoybuyMappedProduct) => Promise<{ externalProductId: string }>;
   updateProduct: (
@@ -39,7 +44,6 @@ function requireConfigured(): void {
   if (!isJoybuyConfigured()) {
     throw new JoybuyNotConfiguredError();
   }
-  // Touch config so missing optional pieces surface consistently.
   getJoybuyConfig();
 }
 
@@ -47,7 +51,7 @@ function notImplemented(operation: string): never {
   joybuyLog({
     operation,
     level: "warn",
-    message: "Joybuy API adapter not implemented",
+    message: "Joybuy domain API path not implemented",
   });
   throw new JoybuyApiNotImplementedError(
     `Joybuy ${operation} is not implemented. Official API paths are not confirmed yet.`,
@@ -58,7 +62,11 @@ export function createJoybuyClient(): JoybuyClient {
   return {
     async authenticate() {
       requireConfigured();
-      notImplemented("authenticate");
+      await authenticateJoybuy();
+    },
+    async request(options) {
+      requireConfigured();
+      return joybuyRequest(options);
     },
     async getProduct(externalProductId: string) {
       requireConfigured();
@@ -115,4 +123,9 @@ let singleton: JoybuyClient | null = null;
 export function getJoybuyClient(): JoybuyClient {
   if (!singleton) singleton = createJoybuyClient();
   return singleton;
+}
+
+/** Test helper — clears the singleton between tests if needed. */
+export function resetJoybuyClientForTests(): void {
+  singleton = null;
 }

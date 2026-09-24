@@ -72,8 +72,8 @@ export function BrandCatalog({ products, enableBrowse = false }: BrandCatalogPro
 
   if (products.length === 0) {
     return (
-      <div className="rounded-3xl bg-white p-10 text-center ring-1 ring-sand/60">
-        <p className="font-serif text-xl text-espresso">Nothing in this collection yet</p>
+      <div className="px-2 py-16 text-center">
+        <p className="font-serif text-xl text-charcoal">Nothing in this collection yet</p>
         <p className="mx-auto mt-2 max-w-xs text-sm text-muted">
           Products for this brand will appear here when they are listed.
         </p>
@@ -92,7 +92,7 @@ export function BrandCatalog({ products, enableBrowse = false }: BrandCatalogPro
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name, SKU…"
-              className="w-full border border-sand bg-white px-4 py-3 text-sm text-charcoal placeholder:text-muted outline-none focus:border-sage"
+              className="w-full border border-sand bg-transparent px-4 py-3 text-sm text-charcoal placeholder:text-muted outline-none focus:border-sage"
               autoComplete="off"
             />
           </label>
@@ -128,8 +128,8 @@ export function BrandCatalog({ products, enableBrowse = false }: BrandCatalogPro
       )}
 
       {filtered.length === 0 ? (
-        <div className="rounded-3xl bg-white p-10 text-center ring-1 ring-sand/60">
-          <p className="font-serif text-xl text-espresso">No matches</p>
+        <div className="px-2 py-16 text-center">
+          <p className="font-serif text-xl text-charcoal">No matches</p>
           <p className="mx-auto mt-2 max-w-xs text-sm text-muted">
             Try another search or category.
           </p>
@@ -139,7 +139,7 @@ export function BrandCatalog({ products, enableBrowse = false }: BrandCatalogPro
               setQuery("");
               setCategory("all");
             }}
-            className="mt-4 text-sm font-semibold text-cocoa underline-offset-2 hover:underline"
+            className="mt-4 text-sm font-semibold text-charcoal underline-offset-2 hover:underline"
           >
             Clear filters
           </button>
@@ -168,10 +168,10 @@ function CategoryChip({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`shrink-0 border px-3 py-1.5 text-xs font-semibold tracking-wide transition ${
+      className={`shrink-0 px-3 py-1.5 text-xs font-semibold tracking-wide transition ${
         active
-          ? "border-charcoal bg-charcoal text-ivory"
-          : "border-sand bg-white text-charcoal hover:border-sage"
+          ? "bg-charcoal text-ivory"
+          : "text-muted hover:text-charcoal"
       }`}
     >
       {label}

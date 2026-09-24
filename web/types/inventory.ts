@@ -20,10 +20,12 @@ export type ProductMaster = {
   cost_price: number | null;
   wholesale_price: number | null;
   retail_price: number | null;
-  /** Console / order-portal shop price (CNY). */
+  /** Console / community source selling price. */
   price: number | null;
-  /** Shopify storefront price (CNY) — independent of console price. */
+  /** Explicit Chosen by Chloe UK / Shopify channel price in GBP. */
   shopify_price: number | null;
+  /** Explicit Joybuy UK channel list price in GBP. */
+  joybuy_price: number | null;
   currency: string | null;
   status: ProductStatus | null;
   active: boolean | null;
