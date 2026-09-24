@@ -4,6 +4,7 @@ import { ModuleNav } from "@/components/thomas/ModuleNav";
 
 const NAV_ITEMS = [
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/orders/consolidations", label: "Consolidations" },
   { href: "/admin/warehouse", label: "Warehouse" },
   { href: "/admin/purchasing", label: "Purchasing" },
   { href: "/admin/inventory", label: "Dashboard", exact: true },
