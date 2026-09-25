@@ -27,6 +27,16 @@ export type CartItem = {
   pricingChannel?: OrderPricingChannel;
 };
 
+/** Soft hold: baskets expire after this many minutes without checkout. */
+export const CART_HOLD_MINUTES = 30;
+const CART_HOLD_MS = CART_HOLD_MINUTES * 60 * 1000;
+
+type PersistedCart = {
+  version: 1;
+  updatedAt: number;
+  items: CartItem[];
+};
+
 type CartContextValue = {
   items: CartItem[];
   totalItems: number;
@@ -34,6 +44,8 @@ type CartContextValue = {
   /** True when every line was added under the UK Shopify channel. */
   isShopifyCart: boolean;
   hydrated: boolean;
+  /** Soft reservation window shown to customers. */
+  holdMinutes: number;
   getQuantity: (productId: Product["id"]) => number;
   addItem: (
     product: Product,
@@ -48,6 +60,8 @@ type CartContextValue = {
 const CartContext = createContext<CartContextValue | null>(null);
 
 const STORAGE_KEY = getClientTenant().commerce.cartStorageKey;
+/** Previous key — cleared so uncleared pre-hold baskets are dropped. */
+const LEGACY_STORAGE_KEYS = ["thomas-cart-chosen-by-chloe-v1"];
 
 function clampToStock(quantity: number, product: Product): number {
   const sellable = getSellableStock(product);
@@ -61,44 +75,102 @@ function normaliseStoredItem(raw: unknown): CartItem | null {
   const entry = raw as CartItem;
   if (!entry.product || !(entry.quantity > 0)) return null;
   const pricingChannel =
-    entry.pricingChannel === "shopify" ? "shopify" : entry.pricingChannel === "community"
-      ? "community"
-      : undefined;
+    entry.pricingChannel === "shopify"
+      ? "shopify"
+      : entry.pricingChannel === "community"
+        ? "community"
+        : undefined;
   return { product: entry.product, quantity: entry.quantity, pricingChannel };
+}
+
+function readPersistedCart(): { items: CartItem[]; updatedAt: number } {
+  try {
+    for (const legacy of LEGACY_STORAGE_KEYS) {
+      window.localStorage.removeItem(legacy);
+    }
+
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { items: [], updatedAt: Date.now() };
+
+    const parsed = JSON.parse(raw) as unknown;
+
+    // Legacy bare array — treat as expired (force clear).
+    if (Array.isArray(parsed)) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return { items: [], updatedAt: Date.now() };
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return { items: [], updatedAt: Date.now() };
+    }
+
+    const bag = parsed as PersistedCart;
+    const updatedAt = typeof bag.updatedAt === "number" ? bag.updatedAt : 0;
+    if (!updatedAt || Date.now() - updatedAt > CART_HOLD_MS) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return { items: [], updatedAt: Date.now() };
+    }
+
+    const items = Array.isArray(bag.items)
+      ? bag.items.map(normaliseStoredItem).filter((item): item is CartItem => item != null)
+      : [];
+
+    return { items, updatedAt };
+  } catch {
+    return { items: [], updatedAt: Date.now() };
+  }
+}
+
+function writePersistedCart(items: CartItem[], updatedAt: number) {
+  try {
+    if (items.length === 0) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    const payload: PersistedCart = { version: 1, updatedAt, items };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Storage may be unavailable (private mode); ignore.
+  }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [updatedAt, setUpdatedAt] = useState(() => Date.now());
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as unknown;
-        if (Array.isArray(parsed)) {
-          setItems(
-            parsed
-              .map(normaliseStoredItem)
-              .filter((item): item is CartItem => item != null),
-          );
-        }
-      }
-    } catch {
-      // Ignore malformed storage and start with an empty cart.
-    } finally {
-      setHydrated(true);
-    }
+    const loaded = readPersistedCart();
+    setItems(loaded.items);
+    setUpdatedAt(loaded.updatedAt);
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch {
-      // Storage may be unavailable (private mode); ignore.
+    writePersistedCart(items, updatedAt);
+  }, [items, updatedAt, hydrated]);
+
+  // Expire the basket when the 30-minute hold elapses while the tab is open.
+  useEffect(() => {
+    if (!hydrated || items.length === 0) return;
+
+    const remaining = CART_HOLD_MS - (Date.now() - updatedAt);
+    if (remaining <= 0) {
+      setItems([]);
+      setUpdatedAt(Date.now());
+      return;
     }
-  }, [items, hydrated]);
+
+    const timer = window.setTimeout(() => {
+      setItems([]);
+      setUpdatedAt(Date.now());
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [hydrated, items.length, updatedAt]);
+
+  const touch = useCallback(() => setUpdatedAt(Date.now()), []);
 
   const getQuantity = useCallback(
     (productId: Product["id"]) => {
@@ -110,6 +182,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = useCallback(
     (product: Product, quantity = 1, pricingChannel?: OrderPricingChannel) => {
+      touch();
       setItems((prev) => {
         const key = String(product.id);
         const channel = pricingChannel ?? "community";
@@ -130,31 +203,42 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return [...prev, { product, quantity: next, pricingChannel: channel }];
       });
     },
-    [],
+    [touch],
   );
 
-  const setQuantity = useCallback((productId: Product["id"], quantity: number) => {
-    setItems((prev) => {
-      const key = String(productId);
-      return prev
-        .map((item) =>
-          String(item.product.id) === key
-            ? {
-                product: item.product,
-                quantity: clampToStock(quantity, item.product),
-                pricingChannel: item.pricingChannel,
-              }
-            : item,
-        )
-        .filter((item) => item.quantity > 0);
-    });
-  }, []);
+  const setQuantity = useCallback(
+    (productId: Product["id"], quantity: number) => {
+      touch();
+      setItems((prev) => {
+        const key = String(productId);
+        return prev
+          .map((item) =>
+            String(item.product.id) === key
+              ? {
+                  product: item.product,
+                  quantity: clampToStock(quantity, item.product),
+                  pricingChannel: item.pricingChannel,
+                }
+              : item,
+          )
+          .filter((item) => item.quantity > 0);
+      });
+    },
+    [touch],
+  );
 
-  const removeItem = useCallback((productId: Product["id"]) => {
-    setItems((prev) => prev.filter((item) => String(item.product.id) !== String(productId)));
-  }, []);
+  const removeItem = useCallback(
+    (productId: Product["id"]) => {
+      touch();
+      setItems((prev) => prev.filter((item) => String(item.product.id) !== String(productId)));
+    },
+    [touch],
+  );
 
-  const clear = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => {
+    touch();
+    setItems([]);
+  }, [touch]);
 
   const isShopifyCart =
     items.length > 0 && items.every((item) => item.pricingChannel === "shopify");
@@ -181,6 +265,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       totalPrice,
       isShopifyCart,
       hydrated,
+      holdMinutes: CART_HOLD_MINUTES,
       getQuantity,
       addItem,
       setQuantity,

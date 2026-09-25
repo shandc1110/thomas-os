@@ -7,7 +7,7 @@ import { formatOrderPrice } from "@/lib/format";
 import { displayUnitPriceForCartLine } from "@/lib/storefront/order-pricing";
 
 export default function StickyCart() {
-  const { items, totalItems, hydrated, isShopifyCart } = useCart();
+  const { items, totalItems, hydrated, isShopifyCart, holdMinutes } = useCart();
   const hasItems = hydrated && totalItems > 0;
 
   const { displayTotal, displayCurrency } = useMemo(() => {
@@ -47,6 +47,9 @@ export default function StickyCart() {
       aria-hidden={!hasItems}
     >
       <div className="mx-auto max-w-2xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+        <p className="mb-1.5 text-center text-[11px] text-muted">
+          Basket is only reserved for {holdMinutes} minutes
+        </p>
         <Link
           href="/checkout"
           className="flex w-full items-center justify-between bg-charcoal px-6 py-4 text-ivory transition-colors hover:bg-charcoal/90"

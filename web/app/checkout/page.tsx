@@ -45,7 +45,7 @@ const CURRENCIES = [
 ];
 
 export default function CheckoutPage() {
-  const { items, totalItems, hydrated, setQuantity, removeItem, clear, isShopifyCart } =
+  const { items, totalItems, hydrated, setQuantity, removeItem, clear, isShopifyCart, holdMinutes } =
     useCart();
   const [form, setForm] = useState<FormState>(initialForm);
   const [currencyTouched, setCurrencyTouched] = useState(false);
@@ -226,6 +226,9 @@ export default function CheckoutPage() {
       </header>
 
       <h1 className="mt-8 font-serif text-3xl text-charcoal">Your order</h1>
+      <p className="mt-2 text-sm text-muted">
+        Basket is only reserved for {holdMinutes} minutes — please check out before it expires.
+      </p>
 
       <section className="mt-5 space-y-3">
         {items.map((item) => {

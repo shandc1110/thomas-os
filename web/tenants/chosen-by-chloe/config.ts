@@ -23,7 +23,7 @@ export const chosenByChloeTenant: TenantConfig = {
   commerce: {
     orderNumberPrefix: "CBC",
     orderNumberStart: 9001,
-    cartStorageKey: "thomas-cart-chosen-by-chloe-v1",
+    cartStorageKey: "thomas-cart-chosen-by-chloe-v2",
     cnyToGbpRate: 9.25,
     /** 10% FX markup: effective rate = 9.25 × 1.1 (customer pays more in GBP). */
     cnyToGbpMarkup: 1.1,
