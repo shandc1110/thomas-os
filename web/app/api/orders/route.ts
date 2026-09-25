@@ -9,7 +9,7 @@ import {
 } from "@/lib/inventory/movements";
 import { getDefaultWarehouseLocation } from "@/lib/warehouse/warehouses";
 import { computeTotalWeightGrams } from "@/lib/weight";
-import { getSellableStock, getOnHandStock } from "@/lib/presell";
+import { getPresellStock } from "@/lib/presell";
 import {
   normaliseOrderPricingChannel,
   resolveAuthoritativeUnitPrice,
@@ -215,6 +215,28 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     productMap.set(String(row.id), row);
   }
 
+  const warehouseLoc = await getDefaultWarehouseLocation(supabase);
+  if (!warehouseLoc) {
+    return NextResponse.json<CreateOrderError>(
+      {
+        success: false,
+        error: "Inventory is not configured. Please run migration 0006 and try again later.",
+      },
+      { status: 503 },
+    );
+  }
+
+  // Prefer warehouse available over products.stock (can drift after direct stock edits).
+  const { data: balanceRows } = await supabase
+    .from("inventory_balances")
+    .select("product_id, available")
+    .eq("location_id", warehouseLoc.locationId)
+    .in("product_id", ids);
+  const locationAvailable = new Map<string, number>();
+  for (const row of balanceRows ?? []) {
+    locationAvailable.set(String(row.product_id), Math.max(Number(row.available) || 0, 0));
+  }
+
   const issues: StockIssue[] = [];
   for (const item of items) {
     const product = productMap.get(String(item.product_id));
@@ -227,7 +249,8 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
       });
       continue;
     }
-    const sellable = getSellableStock(product);
+    const onHand = locationAvailable.get(String(item.product_id)) ?? 0;
+    const sellable = onHand + getPresellStock(product);
     if (sellable < item.quantity) {
       issues.push({
         product_id: item.product_id,
@@ -258,27 +281,17 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
   // Allocate order number early so stock movements can reference it.
   const reservedOrderNumber = await allocateOrderNumber(supabase);
 
-  const warehouseLoc = await getDefaultWarehouseLocation(supabase);
-  if (!warehouseLoc) {
-    return NextResponse.json<CreateOrderError>(
-      {
-        success: false,
-        error: "Inventory is not configured. Please run migration 0006 and try again later.",
-      },
-      { status: 503 },
-    );
-  }
-
   const applied = items.map((item) => ({ productId: item.product_id, quantity: item.quantity }));
 
   const { allocations, error: movError } = await recordCustomerOrderMovements(
     supabase,
     items.map((item) => {
       const product = productMap.get(String(item.product_id))!;
+      const onHand = locationAvailable.get(String(item.product_id)) ?? 0;
       return {
         product_id: item.product_id,
         quantity: item.quantity,
-        on_hand: getOnHandStock(product),
+        on_hand: onHand,
       };
     }),
     "pending",
@@ -293,14 +306,18 @@ export async function POST(request: Request): Promise<NextResponse<CreateOrderRe
     return NextResponse.json<CreateOrderError>(
       {
         success: false,
-        error: "Some items sold out while you were checking out.",
+        error: movError.includes("Insufficient")
+          ? "Some items are no longer available in the requested quantity."
+          : "Some items sold out while you were checking out.",
         issues: items.map((item) => {
           const product = productMap.get(String(item.product_id));
+          const onHand = locationAvailable.get(String(item.product_id)) ?? 0;
+          const sellable = product ? onHand + getPresellStock(product) : 0;
           return {
             product_id: item.product_id,
             name: product?.name ?? "Unknown item",
             requested: item.quantity,
-            available: product ? getSellableStock(product) : 0,
+            available: sellable,
           };
         }),
       },
