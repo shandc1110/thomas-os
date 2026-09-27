@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { staffRoute } from "@/lib/thomas/api/staff-route";
 import { getOrganizationId } from "@/lib/thomas/tenant/scope";
-import { listOrdersWithItems } from "@/lib/orders";
+import { listOrdersWithItems, markPackingSlipsPrinted } from "@/lib/orders";
 import {
   buildCombinedPackingSlipData,
   groupOrdersByShippingAddress,
@@ -57,6 +57,11 @@ export const POST = staffRoute(async ({ request, supabase }) => {
   try {
     const slips = groupOrdersByShippingAddress(eligible).map(buildCombinedPackingSlipData);
     const pdfBuffer = await generateCombinedPackingSlipsPdf(slips);
+    await markPackingSlipsPrinted(
+      supabase,
+      eligible.map((o) => o.id),
+      orgId,
+    );
     const stamp = new Date().toISOString().slice(0, 10);
 
     return new NextResponse(new Uint8Array(pdfBuffer), {

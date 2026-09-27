@@ -28,6 +28,8 @@ export type OrderRecord = {
   shipped_at: string | null;
   picked_at: string | null;
   packed_at: string | null;
+  /** Last time a packing slip (single or combined) was generated; null = not printed. */
+  packing_slip_printed_at: string | null;
   created_at: string | null;
 };
 

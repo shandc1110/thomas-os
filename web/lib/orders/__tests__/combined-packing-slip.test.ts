@@ -49,6 +49,7 @@ function order(overrides: Partial<OrderWithItems> = {}): OrderWithItems {
     shipped_at: null,
     picked_at: null,
     packed_at: null,
+    packing_slip_printed_at: null,
     created_at: "2026-09-01T00:00:00Z",
     shopify_admin_url: null,
     ...overrides,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { staffRoute } from "@/lib/thomas/api/staff-route";
 import { getOrganizationId } from "@/lib/thomas/tenant/scope";
-import { buildPackingSlipData, getOrderById } from "@/lib/orders";
+import { buildPackingSlipData, getOrderById, markPackingSlipsPrinted } from "@/lib/orders";
 import { generatePackingSlipPdf } from "@/lib/pdf/packingSlip";
 
 export const runtime = "nodejs";
@@ -21,6 +21,7 @@ export const GET = staffRoute<{ id: string }>(async ({ supabase, params }) => {
   try {
     const slipData = buildPackingSlipData(order);
     const pdfBuffer = await generatePackingSlipPdf(slipData);
+    await markPackingSlipsPrinted(supabase, [order.id], orgId);
     const filename = `packing-slip-${slipData.orderNumber}.pdf`;
 
     return new NextResponse(new Uint8Array(pdfBuffer), {

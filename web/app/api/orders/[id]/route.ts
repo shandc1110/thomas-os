@@ -54,5 +54,18 @@ export const PATCH = staffRoute<{ id: string }>(async ({ request, supabase, para
     return NextResponse.json({ success: true, order });
   }
 
+  if (action === "mark_slip_printed" || action === "mark_slip_unprinted") {
+    const printedAt = action === "mark_slip_printed" ? new Date().toISOString() : null;
+    const { error } = await supabase
+      .from("orders")
+      .update({ packing_slip_printed_at: printedAt })
+      .eq("id", params.id)
+      .eq("organization_id", orgId);
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+    return NextResponse.json({ success: true, packing_slip_printed_at: printedAt });
+  }
+
   return NextResponse.json({ success: false, error: "Unknown action." }, { status: 400 });
 });

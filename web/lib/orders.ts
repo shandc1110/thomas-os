@@ -54,8 +54,28 @@ function mapOrderRow(row: OrderRow): OrderRecord {
     shipped_at: (row.shipped_at as string | null) ?? null,
     picked_at: (row.picked_at as string | null) ?? null,
     packed_at: (row.packed_at as string | null) ?? null,
+    packing_slip_printed_at: (row.packing_slip_printed_at as string | null) ?? null,
     created_at: (row.created_at as string | null) ?? null,
   };
+}
+
+/**
+ * Stamp orders as having had a packing slip generated. Best-effort: a failure is
+ * logged but never blocks the PDF download.
+ */
+export async function markPackingSlipsPrinted(
+  supabase: SupabaseClient,
+  orderIds: (string | number)[],
+  organizationId?: string,
+): Promise<void> {
+  if (orderIds.length === 0) return;
+  let query = supabase
+    .from("orders")
+    .update({ packing_slip_printed_at: new Date().toISOString() })
+    .in("id", orderIds.map(String));
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { error } = await query;
+  if (error) console.error("markPackingSlipsPrinted failed:", error.message);
 }
 
 function mapOrderItemRow(row: OrderItemRow): OrderItemRecord {

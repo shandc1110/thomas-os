@@ -29,6 +29,7 @@ export default function AdminOrdersPage() {
     "pdf" | "combined" | "shopify" | "fulfill" | null
   >(null);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [slipFilter, setSlipFilter] = useState<"all" | "unprinted" | "printed">("all");
 
   const loadOrders = useCallback(async () => {
     const response = await fetch("/api/orders/list");
@@ -49,7 +50,20 @@ export default function AdminOrdersPage() {
     }).finally(() => setLoading(false));
   }, [loadOrders]);
 
-  const allSelected = orders.length > 0 && selected.size === orders.length;
+  const visibleOrders = useMemo(
+    () =>
+      orders.filter((o) =>
+        slipFilter === "all"
+          ? true
+          : slipFilter === "printed"
+            ? Boolean(o.packing_slip_printed_at)
+            : !o.packing_slip_printed_at,
+      ),
+    [orders, slipFilter],
+  );
+
+  const allSelected =
+    visibleOrders.length > 0 && visibleOrders.every((o) => selected.has(String(o.id)));
   const someSelected = selected.size > 0;
 
   const selectedOrders = useMemo(
@@ -61,7 +75,33 @@ export default function AdminOrdersPage() {
     if (allSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(orders.map((o) => String(o.id))));
+      setSelected(new Set(visibleOrders.map((o) => String(o.id))));
+    }
+  }
+
+  async function setSlipPrinted(order: OrderListItem, printed: boolean) {
+    setError(null);
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: printed ? "mark_slip_printed" : "mark_slip_unprinted" }),
+      });
+      const result = (await response.json()) as {
+        success: boolean;
+        error?: string;
+        packing_slip_printed_at?: string | null;
+      };
+      if (!response.ok || !result.success) throw new Error(result.error ?? "Update failed.");
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === order.id
+            ? { ...o, packing_slip_printed_at: result.packing_slip_printed_at ?? null }
+            : o,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update packing slip status.");
     }
   }
 
@@ -93,6 +133,7 @@ export default function AdminOrdersPage() {
       setError(`Downloaded ${succeeded} of ${selectedOrders.length} before an error occurred.`);
     } finally {
       setBulkLoading(null);
+      await loadOrders().catch(() => undefined);
     }
   }
 
@@ -135,6 +176,7 @@ export default function AdminOrdersPage() {
       setError(err instanceof Error ? err.message : "Could not generate combined packing slips.");
     } finally {
       setBulkLoading(null);
+      await loadOrders().catch(() => undefined);
     }
   }
 
@@ -317,6 +359,33 @@ export default function AdminOrdersPage() {
           </p>
         </div>
       ) : (
+        <>
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="font-medium uppercase tracking-widest text-muted">Packing slip</span>
+          {(
+            [
+              ["all", `All (${orders.length})`],
+              ["unprinted", `Not printed (${orders.filter((o) => !o.packing_slip_printed_at).length})`],
+              ["printed", `Printed (${orders.filter((o) => o.packing_slip_printed_at).length})`],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setSlipFilter(key);
+                setSelected(new Set());
+              }}
+              className={`rounded-full px-3 py-1.5 font-semibold ring-1 ${
+                slipFilter === key
+                  ? "bg-cocoa text-cream ring-cocoa"
+                  : "bg-white text-espresso ring-sand hover:bg-linen"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-sand/60">
           <div className="hidden border-b border-sand/60 px-4 py-3 text-xs font-medium uppercase tracking-widest text-muted sm:grid sm:grid-cols-[2rem_1.4fr_0.8fr_0.8fr_0.7fr_0.7fr] sm:items-center sm:gap-3">
             <label className="flex cursor-pointer items-center justify-center">
@@ -347,7 +416,7 @@ export default function AdminOrdersPage() {
           </div>
 
           <ul className="divide-y divide-sand/60">
-            {orders.map((order) => {
+            {visibleOrders.map((order) => {
               const orderNumber = order.order_number ?? String(order.id);
               const shopifySynced = Boolean(order.shopify_draft_order_id);
               const isCancelled =
@@ -405,8 +474,32 @@ export default function AdminOrdersPage() {
                       </p>
                     )}
                   </div>
-                  <div>
-                    <StatusBadge ok={true} label="PDF" />
+                  <div className="flex flex-col items-start gap-0.5">
+                    {order.packing_slip_printed_at ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-xs font-medium text-green-700"
+                        title={new Date(order.packing_slip_printed_at).toLocaleString("en-GB")}
+                      >
+                        <span aria-hidden>🖨️</span>
+                        Printed{" "}
+                        {new Date(order.packing_slip_printed_at).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                        <span aria-hidden>○</span>
+                        Not printed
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSlipPrinted(order, !order.packing_slip_printed_at)}
+                      className="text-[11px] text-muted underline-offset-2 hover:text-cocoa hover:underline"
+                    >
+                      {order.packing_slip_printed_at ? "Mark not printed" : "Mark printed"}
+                    </button>
                   </div>
                   <div>
                     <StatusBadge
@@ -434,7 +527,11 @@ export default function AdminOrdersPage() {
               );
             })}
           </ul>
+          {visibleOrders.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-muted">No orders match this filter.</p>
+          )}
         </div>
+        </>
       )}
     </main>
   );
