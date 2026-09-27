@@ -52,6 +52,16 @@ export async function addStockTakeLine(
     counted_quantity: number;
   },
 ): Promise<{ lineId: string | null; variance: number; error: string | null }> {
+  const { data: session } = await supabase
+    .from("stock_take_sessions")
+    .select("status")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!session) return { lineId: null, variance: 0, error: "Session not found." };
+  if (session.status !== "in_progress") {
+    return { lineId: null, variance: 0, error: `Session is ${session.status}; start a new stock take.` };
+  }
+
   const { data: balance } = await supabase
     .from("inventory_balances")
     .select("available")
@@ -61,6 +71,26 @@ export async function addStockTakeLine(
 
   const systemQty = (balance?.available as number) ?? 0;
   const variance = input.counted_quantity - systemQty;
+
+  // A recount replaces the earlier unapproved line, else approval would apply the variance twice.
+  const { data: existing } = await supabase
+    .from("stock_take_lines")
+    .select("id")
+    .eq("session_id", sessionId)
+    .eq("product_id", input.product_id)
+    .eq("location_id", input.location_id)
+    .eq("approved", false)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    const { error: updateError } = await supabase
+      .from("stock_take_lines")
+      .update({ system_quantity: systemQty, counted_quantity: input.counted_quantity, variance })
+      .eq("id", existing.id);
+    if (updateError) return { lineId: null, variance: 0, error: updateError.message };
+    return { lineId: existing.id as string, variance, error: null };
+  }
 
   const { data, error } = await supabase
     .from("stock_take_lines")
@@ -145,6 +175,13 @@ export async function getStockTakeSession(
 
   if (error) return { session: null, error: error.message };
 
+  const { data: locations } = await supabase
+    .from("warehouse_locations")
+    .select("id, code, name")
+    .eq("warehouse_id", data.warehouse_id)
+    .eq("active", true)
+    .order("code");
+
   return {
     session: {
       id: data.id,
@@ -155,6 +192,7 @@ export async function getStockTakeSession(
       completed_at: data.completed_at,
       started_by: data.started_by,
       warehouse: (data as { warehouses?: { code: string; name: string } }).warehouses,
+      locations: (locations ?? []) as { id: string; code: string; name: string | null }[],
       lines: (
         (data as { stock_take_lines?: Record<string, unknown>[] }).stock_take_lines ?? []
       ).map((line) => ({

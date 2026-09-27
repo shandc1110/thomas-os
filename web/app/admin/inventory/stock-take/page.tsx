@@ -10,6 +10,7 @@ export default function StockTakePage() {
   const [sessions, setSessions] = useState<StockTakeSession[]>([]);
   const [warehouseId, setWarehouseId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -26,14 +27,25 @@ export default function StockTakePage() {
   }, []);
 
   async function startSession() {
-    const response = await fetch("/api/inventory/stock-take", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ warehouse_id: warehouseId }),
-    });
-    const result = await response.json();
-    if (result.success) {
-      window.location.href = `/admin/inventory/stock-take/${result.session.id}`;
+    setError(null);
+    if (!warehouseId) {
+      setError("Choose a warehouse first.");
+      return;
+    }
+    try {
+      const response = await fetch("/api/inventory/stock-take", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ warehouse_id: warehouseId }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        window.location.href = `/admin/inventory/stock-take/${result.session.id}`;
+      } else {
+        setError(result.error ?? "Could not start stock take.");
+      }
+    } catch {
+      setError("Could not start stock take: network error.");
     }
   }
 
@@ -63,6 +75,7 @@ export default function StockTakePage() {
             Start Stock Take
           </button>
         </div>
+        {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
       </div>
 
       <div className="rounded-2xl bg-white p-5 ring-1 ring-sand/60">

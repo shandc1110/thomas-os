@@ -27,7 +27,13 @@ export default function StockTakeSessionPage({ params }: PageProps) {
     fetch(`/api/inventory/stock-take?session=${sessionId}`)
       .then((r) => r.json())
       .then((result) => {
-        if (result.success) setSession(result.session);
+        if (!result.success) {
+          setMessage(result.error ?? "Could not load stock take session.");
+          return;
+        }
+        const loaded = result.session as StockTakeSession;
+        setSession(loaded);
+        setLocationId((current) => current || loaded.locations?.[0]?.id || "");
       });
     fetch("/api/inventory/products")
       .then((r) => r.json())
@@ -49,38 +55,75 @@ export default function StockTakeSessionPage({ params }: PageProps) {
   }
 
   async function addCount() {
-    if (!sessionId || !productId || !locationId) return;
+    if (!sessionId) return;
+    if (!productId) {
+      setMessage("Choose a product (or scan its barcode) first.");
+      return;
+    }
+    if (!locationId) {
+      setMessage("Choose a location first. This warehouse has no active locations set up.");
+      return;
+    }
+    if (!Number.isInteger(counted) || counted < 0) {
+      setMessage("Counted quantity must be a whole number, 0 or more.");
+      return;
+    }
     setSubmitting(true);
-    const response = await fetch(`/api/inventory/stock-take/${sessionId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: productId, location_id: locationId, counted_quantity: counted }),
-    });
-    const result = await response.json();
-    setSubmitting(false);
-    if (result.success) {
-      setMessage(`Counted. Variance: ${result.variance > 0 ? "+" : ""}${result.variance}`);
+    try {
+      const response = await fetch(`/api/inventory/stock-take/${sessionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: productId, location_id: locationId, counted_quantity: counted }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(`Could not record count: ${result.error ?? response.statusText}`);
+        return;
+      }
+      const name = products.find((p) => String(p.id) === productId)?.name ?? "Product";
+      setMessage(`Counted ${name}: ${counted}. Variance: ${result.variance > 0 ? "+" : ""}${result.variance}`);
+      setProductId("");
+      setBarcode("");
+      setCounted(0);
       const refresh = await fetch(`/api/inventory/stock-take?session=${sessionId}`);
       const data = await refresh.json();
       if (data.success) setSession(data.session);
+    } catch {
+      setMessage("Could not record count: network error.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function approve() {
     if (!sessionId) return;
+    const lineCount = session?.lines?.length ?? 0;
+    const prompt =
+      lineCount === 0
+        ? "No counts have been recorded. Approving will close this session without changing stock. Continue?"
+        : `Apply stock adjustments for ${lineCount} counted line${lineCount === 1 ? "" : "s"} and close this session?`;
+    if (!window.confirm(prompt)) return;
+
     setSubmitting(true);
-    const response = await fetch(`/api/inventory/stock-take/${sessionId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve" }),
-    });
-    const result = await response.json();
-    setSubmitting(false);
-    if (result.success) {
+    try {
+      const response = await fetch(`/api/inventory/stock-take/${sessionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve" }),
+      });
+      const result = await response.json();
+      if (!result.success) {
+        setMessage(`Could not approve: ${result.error ?? response.statusText}`);
+        return;
+      }
       setMessage("Stock take approved. Adjustments applied.");
       const refresh = await fetch(`/api/inventory/stock-take?session=${sessionId}`);
       const data = await refresh.json();
       if (data.success) setSession(data.session);
+    } catch {
+      setMessage("Could not approve: network error.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -129,7 +172,21 @@ export default function StockTakeSessionPage({ params }: PageProps) {
               Search
             </button>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-4">
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="rounded-2xl border border-sand px-4 py-2.5 text-sm"
+              aria-label="Location"
+            >
+              <option value="">Location…</option>
+              {(session.locations ?? []).map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.code}
+                  {l.name ? ` — ${l.name}` : ""}
+                </option>
+              ))}
+            </select>
             <select
               value={productId}
               onChange={(e) => setProductId(e.target.value)}
@@ -174,6 +231,7 @@ export default function StockTakeSessionPage({ params }: PageProps) {
           <thead>
             <tr className="text-left text-xs uppercase tracking-widest text-muted">
               <th className="pb-2">Product</th>
+              <th>Location</th>
               <th>System</th>
               <th>Counted</th>
               <th>Variance</th>
@@ -184,6 +242,7 @@ export default function StockTakeSessionPage({ params }: PageProps) {
             {(session.lines ?? []).map((line) => (
               <tr key={line.id} className="border-t border-sand/40">
                 <td className="py-2">{line.product?.name}</td>
+                <td>{line.location?.code ?? "—"}</td>
                 <td>{line.system_quantity}</td>
                 <td>{line.counted_quantity ?? "—"}</td>
                 <td className={line.variance && line.variance !== 0 ? "font-semibold text-amber-700" : ""}>

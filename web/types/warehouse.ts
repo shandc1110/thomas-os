@@ -52,6 +52,8 @@ export type StockTakeSession = {
   started_by: string | null;
   lines?: StockTakeLine[];
   warehouse?: { code: string; name: string };
+  /** Active locations in the session's warehouse, for recording counts. */
+  locations?: { id: string; code: string; name: string | null }[];
 };
 
 export type StockTakeLine = {
