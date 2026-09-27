@@ -169,6 +169,50 @@ export async function getOrderById(
   };
 }
 
+/** Orders with line items; all orders in the org when orderIds is omitted. */
+export async function listOrdersWithItems(
+  supabase: SupabaseClient,
+  organizationId?: string,
+  orderIds?: string[],
+): Promise<{ orders: OrderWithItems[]; error: string | null }> {
+  let query = supabase
+    .from("orders")
+    .select(
+      `
+      *,
+      order_items (
+        id,
+        order_id,
+        product_id,
+        quantity,
+        price,
+        presell_quantity,
+        products ( name, sku, weight_grams, image_url, gallery_images )
+      )
+    `,
+    )
+    .order("created_at", { ascending: true });
+
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  if (orderIds && orderIds.length > 0) query = query.in("id", orderIds);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("listOrdersWithItems failed:", error.message);
+    return { orders: [], error: error.message };
+  }
+
+  const orders = (data ?? []).map((row) => {
+    const order = mapOrderRow(row as OrderRow);
+    const items = (((row as { order_items?: OrderItemRow[] }).order_items ?? []) as OrderItemRow[]).map(
+      mapOrderItemRow,
+    );
+    return { ...order, items, total: computeOrderTotal(items), shopify_admin_url: null };
+  });
+
+  return { orders, error: null };
+}
+
 export type AdjacentOrderRef = {
   id: string | number;
   order_number: string | null;

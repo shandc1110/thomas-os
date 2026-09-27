@@ -58,6 +58,8 @@ export type OrderListItem = OrderRecord & {
 
 export type PackingSlipData = {
   orderNumber: string;
+  /** Set when several orders ship together on one combined slip. */
+  orderNumbers?: string[];
   firstName: string;
   lastName: string;
   customerName: string;
@@ -76,7 +78,13 @@ export type PackingSlipData = {
     lineTotal: number;
     /** Main + gallery URLs (up to 3 used on the packing slip). */
     imageUrls: string[];
+    /** Combined slips: which orders this line came from, e.g. "CBC9163 ×1 · CBC9170 ×2". */
+    orderRefs?: string;
+    /** Combined slips mixing currencies: this line's currency (else slip currency). */
+    currency?: string;
   }[];
+  /** Combined slips mixing currencies: one total per currency instead of subtotal/grand total. */
+  totalsByCurrency?: { currency: string; total: number }[];
   subtotal: number;
   grandTotal: number;
   totalWeightGrams: number;

@@ -5,7 +5,7 @@ import React from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import type { PackingSlipData } from "@/types/order";
 import { cbcV4Assets } from "@/lib/brand/chosen-by-chloe";
-import { PackingSlipDocument } from "@/components/pdf/PackingSlip";
+import { PackingSlipDocument, PackingSlipsDocument } from "@/components/pdf/PackingSlip";
 
 async function fetchAsDataUri(url: string): Promise<string | null> {
   try {
@@ -66,5 +66,43 @@ export async function generatePackingSlipPdf(data: PackingSlipData): Promise<Buf
   const buffer = await renderToBuffer(
     element as React.ReactElement<DocumentProps>,
   );
+  return Buffer.from(buffer);
+}
+
+/** One PDF containing a page per slip (e.g. one combined slip per shipping address). */
+export async function generateCombinedPackingSlipsPdf(slips: PackingSlipData[]): Promise<Buffer> {
+  const logoSrc = await loadPrimaryLogoDataUri();
+
+  const cache = new Map<string, Promise<string | null>>();
+  const load = (url: string) => {
+    let pending = cache.get(url);
+    if (!pending) {
+      pending = fetchAsDataUri(url);
+      cache.set(url, pending);
+    }
+    return pending;
+  };
+
+  const resolvedSlips = await Promise.all(
+    slips.map(async (data) => {
+      const itemImages: PackingSlipItemImages = {};
+      await Promise.all(
+        data.items.map(async (item, index) => {
+          const resolved = (await Promise.all(item.imageUrls.slice(0, 3).map(load))).filter(
+            (uri): uri is string => Boolean(uri),
+          );
+          if (resolved.length > 0) itemImages[index] = resolved;
+        }),
+      );
+      return { data, itemImages };
+    }),
+  );
+
+  const element = React.createElement(PackingSlipsDocument, {
+    slips: resolvedSlips,
+    logoSrc,
+    title: "Combined Packing Slips",
+  });
+  const buffer = await renderToBuffer(element as React.ReactElement<DocumentProps>);
   return Buffer.from(buffer);
 }

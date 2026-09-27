@@ -19,6 +19,7 @@ const styles = StyleSheet.create({
     color: BRAND.colors.espresso,
     backgroundColor: BRAND.colors.cream,
     padding: 40,
+    paddingBottom: 90,
   },
   header: {
     alignItems: "center",
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   detailLabel: {
-    width: 110,
+    width: 80,
     color: BRAND.colors.muted,
     fontSize: 9,
   },
@@ -180,10 +181,41 @@ type PackingSlipProps = {
 };
 
 export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingSlipProps) {
-  const currency = data.currency;
-
   return (
     <Document title={`Packing Slip ${data.orderNumber}`} author={BRAND.name}>
+      <PackingSlipPage data={data} logoSrc={logoSrc} itemImages={itemImages} />
+    </Document>
+  );
+}
+
+type PackingSlipsProps = {
+  slips: { data: PackingSlipData; itemImages?: Record<number, string[]> }[];
+  logoSrc: string;
+  title?: string;
+};
+
+/** Several slips in one PDF, one per shipping address. */
+export function PackingSlipsDocument({ slips, logoSrc, title = "Packing Slips" }: PackingSlipsProps) {
+  return (
+    <Document title={title} author={BRAND.name}>
+      {slips.map((slip, index) => (
+        <PackingSlipPage
+          key={index}
+          data={slip.data}
+          logoSrc={logoSrc}
+          itemImages={slip.itemImages ?? {}}
+        />
+      ))}
+    </Document>
+  );
+}
+
+function PackingSlipPage({ data, logoSrc, itemImages = {} }: PackingSlipProps) {
+  const currency = data.currency;
+  const orderNumbers = data.orderNumbers ?? [data.orderNumber];
+  const isCombined = orderNumbers.length > 1;
+
+  return (
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt */}
@@ -191,10 +223,17 @@ export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingS
           <Text style={styles.tagline}>{BRAND.tagline}</Text>
         </View>
 
-        <Text style={styles.slipTitle}>Packing Slip</Text>
-        <Text style={styles.orderRef}>Order {data.orderNumber}</Text>
+        <Text style={styles.slipTitle}>
+          {isCombined ? "Combined Packing Slip" : "Packing Slip"}
+        </Text>
+        <Text style={styles.orderRef}>
+          {isCombined
+            ? `${orderNumbers.length} Orders · ${orderNumbers.join(" · ")}`
+            : `Order ${data.orderNumber}`}
+        </Text>
 
-        <View style={styles.section}>
+        <View style={{ flexDirection: "row" }} wrap={false}>
+        <View style={[styles.section, { flex: 1, marginRight: 8 }]}>
           <Text style={styles.sectionLabel}>Ship To</Text>
           <Text style={{ fontSize: 10, marginBottom: 6, fontFamily: "Times-Bold" }}>
             {data.firstName} {data.lastName}
@@ -205,7 +244,7 @@ export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingS
           ) : null}
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { flex: 1.2, marginLeft: 8 }]}>
           <Text style={styles.sectionLabel}>Order Details</Text>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Phone</Text>
@@ -234,8 +273,9 @@ export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingS
             </View>
           ) : null}
         </View>
+        </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { marginBottom: 0, paddingBottom: 4 }]}>
           <Text style={styles.sectionLabel}>Items</Text>
           <View style={styles.tableHeader}>
             <Text style={[styles.thText, styles.colImage]}>Photo</Text>
@@ -261,20 +301,39 @@ export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingS
                     <Text style={styles.tdMuted}>—</Text>
                   )}
                 </View>
-                <Text style={[styles.tdText, styles.colItem]}>{item.name}</Text>
+                <View style={styles.colItem}>
+                  <Text style={styles.tdText}>{item.name}</Text>
+                  {item.orderRefs ? (
+                    <Text style={[styles.tdMuted, { fontSize: 7, marginTop: 2 }]}>
+                      {item.orderRefs}
+                    </Text>
+                  ) : null}
+                </View>
                 <Text style={[styles.tdMuted, styles.colSku]}>{item.sku ?? "—"}</Text>
                 <Text style={[styles.tdText, styles.colQty]}>{item.quantity}</Text>
                 <Text style={[styles.tdText, styles.colPrice]}>
-                  {formatOrderPrice(item.unitPrice, currency)}
+                  {formatOrderPrice(item.unitPrice, item.currency ?? currency)}
                 </Text>
                 <Text style={[styles.tdText, styles.colTotal]}>
-                  {formatOrderPrice(item.lineTotal, currency)}
+                  {formatOrderPrice(item.lineTotal, item.currency ?? currency)}
                 </Text>
               </View>
             );
           })}
 
-          <View style={styles.totalsSection}>
+          {data.totalsByCurrency && data.totalsByCurrency.length > 1 ? (
+            <View style={styles.totalsSection} wrap={false}>
+              {data.totalsByCurrency.map((t) => (
+                <View key={t.currency} style={styles.totalRow}>
+                  <Text style={[styles.totalLabel, styles.grandTotal]}>Total ({t.currency})</Text>
+                  <Text style={[styles.totalValue, styles.grandTotal]}>
+                    {formatOrderPrice(t.total, t.currency)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+          <View style={styles.totalsSection} wrap={false}>
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Subtotal</Text>
               <Text style={styles.totalValue}>
@@ -288,9 +347,10 @@ export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingS
               </Text>
             </View>
           </View>
+          )}
         </View>
 
-        <View style={styles.footer}>
+        <View style={styles.footer} fixed>
           <Text style={styles.footerText}>
             {BRAND.name} · {BRAND.tagline}
           </Text>
@@ -299,6 +359,5 @@ export function PackingSlipDocument({ data, logoSrc, itemImages = {} }: PackingS
           </Text>
         </View>
       </Page>
-    </Document>
   );
 }

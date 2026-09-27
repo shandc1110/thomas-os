@@ -25,7 +25,9 @@ export default function AdminOrdersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bulkLoading, setBulkLoading] = useState<"pdf" | "shopify" | "fulfill" | null>(null);
+  const [bulkLoading, setBulkLoading] = useState<
+    "pdf" | "combined" | "shopify" | "fulfill" | null
+  >(null);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
@@ -89,6 +91,48 @@ export default function AdminOrdersPage() {
       setBulkMessage(`Downloaded ${succeeded} packing slip${succeeded === 1 ? "" : "s"}.`);
     } catch {
       setError(`Downloaded ${succeeded} of ${selectedOrders.length} before an error occurred.`);
+    } finally {
+      setBulkLoading(null);
+    }
+  }
+
+  /** One slip per shipping address; selected orders, or all open orders when none given. */
+  async function handleCombinedSlips(orderIds?: string[]) {
+    setBulkLoading("combined");
+    setBulkMessage(null);
+    setError(null);
+    try {
+      const response = await fetch("/api/orders/packing-slips/combined", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderIds ? { order_ids: orderIds } : {}),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(result.error ?? "Could not generate combined packing slips.");
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition") ?? "";
+      const filename =
+        /filename="([^"]+)"/.exec(disposition)?.[1] ?? "combined-packing-slips.pdf";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      const slips = response.headers.get("X-Slip-Count");
+      const count = response.headers.get("X-Order-Count");
+      setBulkMessage(
+        slips && count
+          ? `Combined ${count} order${count === "1" ? "" : "s"} into ${slips} packing slip${slips === "1" ? "" : "s"}.`
+          : "Combined packing slips downloaded.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not generate combined packing slips.");
     } finally {
       setBulkLoading(null);
     }
@@ -180,9 +224,20 @@ export default function AdminOrdersPage() {
             </Link>
           </p>
         </div>
-        <Link href="/" className="text-sm font-medium text-clay hover:text-cocoa">
-          Shop &rarr;
-        </Link>
+        <div className="flex flex-col items-end gap-2">
+          <Link href="/" className="text-sm font-medium text-clay hover:text-cocoa">
+            Shop &rarr;
+          </Link>
+          <button
+            type="button"
+            onClick={() => handleCombinedSlips()}
+            disabled={bulkLoading !== null}
+            title="One packing slip per shipping address, covering every open (unfulfilled) order"
+            className="rounded-full bg-cocoa px-4 py-2 text-xs font-semibold text-cream disabled:opacity-60"
+          >
+            {bulkLoading === "combined" ? "Generating…" : "Combined packing slips (open orders)"}
+          </button>
+        </div>
       </header>
 
       {someSelected && (
@@ -197,6 +252,15 @@ export default function AdminOrdersPage() {
             className="rounded-full bg-cocoa px-4 py-2 text-xs font-semibold text-cream disabled:opacity-60"
           >
             {bulkLoading === "pdf" ? "Downloading…" : "Download PDFs"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCombinedSlips([...selected])}
+            disabled={bulkLoading !== null}
+            title="Merge selected orders going to the same address into one slip"
+            className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-espresso ring-1 ring-sand disabled:opacity-60"
+          >
+            {bulkLoading === "combined" ? "Generating…" : "Combined slip"}
           </button>
           <button
             type="button"
